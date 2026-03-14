@@ -298,56 +298,10 @@ EOF
 configure_secrets() {
   step "4" "Configurando secrets nas Edge Functions"
 
-  info "Enviando secrets para o Supabase (via Management API)..."
-
-  # Usa arquivo JSON temporário para evitar problemas com chars especiais
-  local TMP_JSON=$(mktemp)
-  python3 -c "
-import json
-secrets = [
-  {'name': 'EVOLUTION_API_URL',         'value': '${EVOLUTION_API_URL}'},
-  {'name': 'EVOLUTION_API_KEY',         'value': '${EVOLUTION_API_KEY}'},
-  {'name': 'SUPABASE_URL',              'value': '${SUPABASE_URL}'},
-  {'name': 'SUPABASE_SERVICE_ROLE_KEY', 'value': '${SUPABASE_SERVICE_ROLE_KEY}'},
-]
-print(json.dumps(secrets))
-" > "$TMP_JSON"
-
-  # Token sem espaços ou quebras de linha
-  local CLEAN_TOKEN
-  CLEAN_TOKEN=$(echo "${SUPABASE_ACCESS_TOKEN}" | tr -d '[:space:]')
-
-  local http_code
-  http_code=$(curl -s -o /dev/null -w "%{http_code}" \
-    -X POST \
-    "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/secrets" \
-    -H "Authorization: Bearer ${CLEAN_TOKEN}" \
-    -H "Content-Type: application/json" \
-    -d "@${TMP_JSON}")
-
-  rm -f "$TMP_JSON"
-
-  case "$http_code" in
-    200|201|204)
-      ok "Secrets configurados com sucesso!"
-      ;;
-    401)
-      warn "HTTP 401 — Access Token inválido ou expirado."
-      warn "Gere um novo em: https://supabase.com/dashboard → Account → Access Tokens"
-      ;;
-    403)
-      warn "HTTP 403 — Sem permissão. Verifique se o Access Token tem acesso ao projeto."
-      ;;
-    404)
-      warn "HTTP 404 — Projeto não encontrado. Project Ref: ${SUPABASE_PROJECT_REF}"
-      ;;
-    *)
-      warn "HTTP $http_code — Secrets podem não ter sido configurados."
-      info "Configure manualmente: Supabase → Edge Functions → Secrets"
-      info "Secrets: EVOLUTION_API_URL, EVOLUTION_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY"
-      ;;
-  esac
+  info "Os secrets serão configurados via Supabase CLI no Passo 5..."
+  ok "Secrets agendados para configuração"
 }
+
 
 
 
@@ -365,7 +319,7 @@ deploy_supabase() {
   fi
   ok "psql pronto"
 
-  # ── Codifica a senha para URL (trata caracteres especiais) ──
+  # ── Codifica a senha para URL ───────────────────────────────
   local DB_PASS_ENCODED
   DB_PASS_ENCODED=$(python3 -c "
 import urllib.parse
@@ -387,13 +341,12 @@ print(urllib.parse.quote('${SUPABASE_DB_PASSWORD}', safe=''))
       echo -e " ${GREEN}✔${NC}"
       mig_ok=$((mig_ok + 1))
     else
-      echo -e " ${YELLOW}~${NC} (já aplicada ou ignorada)"
+      echo -e " ${YELLOW}~${NC}"
     fi
   done
-
   ok "Migrations: $mig_ok/$mig_total aplicadas"
 
-  # ── Instala Supabase CLI para deploy das Edge Functions ─────
+  # ── Instala Supabase CLI ────────────────────────────────────
   if ! command -v supabase &>/dev/null; then
     info "Instalando Supabase CLI..."
     local SB_VER="2.0.5"
@@ -408,11 +361,6 @@ print(urllib.parse.quote('${SUPABASE_DB_PASSWORD}', safe=''))
     fi
     rm -f /tmp/supabase.tar.gz
   fi
-
-  if ! command -v supabase &>/dev/null; then
-    warn "Supabase CLI não instalado — Edge Functions não deployadas"
-    return
-  fi
   ok "Supabase CLI $(supabase --version 2>/dev/null | head -1)"
 
   # ── Login e link ────────────────────────────────────────────
@@ -422,6 +370,17 @@ print(urllib.parse.quote('${SUPABASE_DB_PASSWORD}', safe=''))
     --project-ref "${SUPABASE_PROJECT_REF}" \
     --password "${SUPABASE_DB_PASSWORD}" 2>/dev/null || true
   ok "Projeto vinculado"
+
+  # ── Configura Secrets via CLI (mais confiável que API REST) ─
+  info "Configurando secrets via Supabase CLI..."
+  supabase secrets set \
+    EVOLUTION_API_URL="${EVOLUTION_API_URL}" \
+    EVOLUTION_API_KEY="${EVOLUTION_API_KEY}" \
+    SUPABASE_URL="${SUPABASE_URL}" \
+    SUPABASE_SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY}" \
+    --project-ref "${SUPABASE_PROJECT_REF}" 2>/dev/null && \
+    ok "Secrets configurados via CLI!" || \
+    warn "Falha ao configurar secrets — configure manualmente no Supabase"
 
   # ── Deploy das Edge Functions ───────────────────────────────
   local FUNCTIONS=(
@@ -453,6 +412,7 @@ print(urllib.parse.quote('${SUPABASE_DB_PASSWORD}', safe=''))
     warn "${#failed[@]} falharam: ${failed[*]}"
   fi
 }
+
 
 
 
