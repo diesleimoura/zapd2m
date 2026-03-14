@@ -300,29 +300,26 @@ configure_secrets() {
 
   info "Enviando secrets para o Supabase (via Management API)..."
 
-  # Usa Python para JSON correto — evita erro 400 com caracteres especiais nas chaves
+  # Monta JSON com Python usando variáveis bash interpoladas diretamente
   local http_code
-  http_code=$(python3 - << 'PYEOF'
-import json, subprocess, os
-
+  http_code=$(python3 -c "
+import json, subprocess
 secrets = [
-  {"name": "EVOLUTION_API_URL",         "value": os.environ.get("EVOLUTION_API_URL", "")},
-  {"name": "EVOLUTION_API_KEY",         "value": os.environ.get("EVOLUTION_API_KEY", "")},
-  {"name": "SUPABASE_URL",              "value": os.environ.get("SUPABASE_URL", "")},
-  {"name": "SUPABASE_SERVICE_ROLE_KEY", "value": os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")},
+  {'name': 'EVOLUTION_API_URL',         'value': '${EVOLUTION_API_URL}'},
+  {'name': 'EVOLUTION_API_KEY',         'value': '${EVOLUTION_API_KEY}'},
+  {'name': 'SUPABASE_URL',              'value': '${SUPABASE_URL}'},
+  {'name': 'SUPABASE_SERVICE_ROLE_KEY', 'value': '${SUPABASE_SERVICE_ROLE_KEY}'},
 ]
-
 r = subprocess.run([
-  "curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
-  "-X", "POST",
-  f"https://api.supabase.com/v1/projects/{os.environ['SUPABASE_PROJECT_REF']}/secrets",
-  "-H", f"Authorization: Bearer {os.environ['SUPABASE_ACCESS_TOKEN']}",
-  "-H", "Content-Type: application/json",
-  "-d", json.dumps(secrets)
+  'curl','-s','-o','/dev/null','-w','%{http_code}',
+  '-X','POST',
+  'https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/secrets',
+  '-H','Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}',
+  '-H','Content-Type: application/json',
+  '-d', json.dumps(secrets)
 ], capture_output=True, text=True)
 print(r.stdout.strip())
-PYEOF
-)
+")
 
   case "$http_code" in
     200|201|204)
@@ -341,10 +338,11 @@ PYEOF
     *)
       warn "HTTP $http_code — Secrets podem não ter sido configurados."
       info "Configure manualmente: Supabase → Edge Functions → Secrets"
-      info "Secrets: EVOLUTION_API_URL, EVOLUTION_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY"
+      info "Secrets necessários: EVOLUTION_API_URL, EVOLUTION_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY"
       ;;
   esac
 }
+
 
 # ─── PASSO 5 — Deploy Supabase CLI ───────────────────────────
 deploy_supabase() {
