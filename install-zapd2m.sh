@@ -589,8 +589,7 @@ print_summary() {
   echo ""
   echo -e "  ${WHITE}${BOLD}PRÓXIMO PASSO — só isso:${NC}\n"
   echo -e "  ${CYAN}1.${NC} Abra ${WHITE}https://$APP_DOMAIN${NC}"
-  echo -e "  ${CYAN}2.${NC} ${YELLOW}⚠ Crie sua conta — a primeira será o ADMIN!${NC}"
-  echo -e "  ${CYAN}3.${NC} Configure a Evolution API em: Admin → Evolution API"
+  echo -e "  ${CYAN}2.${NC} ${YELLOW}⚠ Crie sua conta — a primeira será o ADMIN!"
   echo ""
   echo -e "  ${BLUE}──────────────────────────────────────────────${NC}"
   echo -e "  Dúvidas? Consulte: ${WHITE}/root/zapd2m/guia/${NC}"
@@ -609,7 +608,6 @@ load_existing_config() {
 
 # ─── Menu de reparo ───────────────────────────────────────────
 repair_menu() {
-  print_banner
   load_existing_config
 
   echo -e "  ${YELLOW}${BOLD}⚠  zapd2m já está instalado nesta VPS!${NC}\n"
