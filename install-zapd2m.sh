@@ -310,18 +310,33 @@ deploy_supabase() {
 
   cd /root/zapd2m
 
-  # Instala Supabase CLI se necessário
+  # Instala Supabase CLI via binário oficial
   if ! command -v supabase &>/dev/null; then
-    info "Instalando Supabase CLI..."
-    npm install -g supabase --silent &>/dev/null
+    info "Instalando Supabase CLI (binário oficial)..."
+    local SB_VER="2.0.5"
+    curl -fsSL "https://github.com/supabase/cli/releases/download/v${SB_VER}/supabase_linux_amd64.tar.gz" \
+      -o /tmp/supabase.tar.gz 2>/dev/null
+    tar -xzf /tmp/supabase.tar.gz -C /tmp 2>/dev/null
+    local BIN
+    BIN=$(find /tmp -name "supabase" -type f 2>/dev/null | head -1)
+    if [ -n "$BIN" ]; then
+      mv "$BIN" /usr/local/bin/supabase
+      chmod +x /usr/local/bin/supabase
+    fi
+    rm -f /tmp/supabase.tar.gz
   fi
-  ok "Supabase CLI pronto"
+
+  if ! command -v supabase &>/dev/null; then
+    warn "Supabase CLI não pôde ser instalado — pulando deploy de funções"
+    warn "Execute manualmente depois: npx supabase functions deploy"
+    return
+  fi
+  ok "Supabase CLI $(supabase --version 2>/dev/null | head -1)"
 
   # Login com Access Token
   info "Autenticando no Supabase CLI..."
-  SUPABASE_ACCESS_TOKEN=$SUPABASE_ACCESS_TOKEN supabase login \
-    --no-browser 2>/dev/null || \
-    echo "$SUPABASE_ACCESS_TOKEN" | supabase login --token-stdin 2>/dev/null || true
+  export SUPABASE_ACCESS_TOKEN="$SUPABASE_ACCESS_TOKEN"
+  supabase login --no-browser 2>/dev/null || true
 
   # Link ao projeto
   info "Vinculando ao projeto..."
