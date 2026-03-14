@@ -55,4 +55,4 @@ INSERT INTO public.roadmap_items (title, description, status, icon, version, sor
 ('Integração Instagram', 'Responda mensagens do Instagram Direct com a mesma IA', 'idea', 'MessageCircle', NULL, 16),
 ('Personalização Visual', 'Temas personalizáveis e white-label para sua marca', 'idea', 'Palette', NULL, 17),
 ('Suporte por Voz', 'IA capaz de entender e responder áudios dos clientes', 'idea', 'Headphones', NULL, 18),
-('API Pública', 'API para desenvolvedores integrarem o ZapMax em seus sistemas', 'idea', 'Globe', NULL, 19);
+('API Pública', 'API para desenvolvedores integrarem o zapd2m em seus sistemas', 'idea', 'Globe', NULL, 19);

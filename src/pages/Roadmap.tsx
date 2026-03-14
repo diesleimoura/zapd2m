@@ -184,7 +184,7 @@ export default function Roadmap() {
           <p className="text-[10px] sm:text-sm text-muted-foreground">
             {t.roadmap.suggestionDesc}
           </p>
-          <button className="text-primary text-xs sm:text-sm font-medium hover:underline flex items-center gap-2 mx-auto" onClick={() => openWhatsApp("Olá! Tenho uma sugestão para o ZapMax.")}>
+          <button className="text-primary text-xs sm:text-sm font-medium hover:underline flex items-center gap-2 mx-auto" onClick={() => openWhatsApp("Olá! Tenho uma sugestão para o zapd2m.")}>
             <Headphones className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> {t.roadmap.sendSuggestion}
           </button>
         </CardContent>

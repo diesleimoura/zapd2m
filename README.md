@@ -1,4 +1,4 @@
-# ZapMax — Funcionalidades do Sistema
+# zapd2m — Funcionalidades do Sistema
 
 ## 📊 Dashboard
 

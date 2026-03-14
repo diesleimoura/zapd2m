@@ -16,7 +16,7 @@ export default function MetricsTab() {
   const { t } = useLanguage();
   const m = t.admin.metrics;
   const [data, setData] = useState<AdminMetrics | null>(() => {
-    const cached = localStorage.getItem("zapmax_admin_metrics");
+    const cached = localStorage.getItem("zapd2m_admin_metrics");
     return cached ? JSON.parse(cached) : null;
   });
   const [loading, setLoading] = useState(false);
@@ -29,7 +29,7 @@ export default function MetricsTab() {
         if (error) throw error;
         if (res?.success) {
           setData(res.data);
-          localStorage.setItem("zapmax_admin_metrics", JSON.stringify(res.data));
+          localStorage.setItem("zapd2m_admin_metrics", JSON.stringify(res.data));
         }
       } catch { console.error("Error fetching admin metrics"); }
       setLoading(false);

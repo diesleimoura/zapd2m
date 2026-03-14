@@ -39,7 +39,7 @@ export default function FloatingButtonTab() {
   const { t } = useLanguage();
   const f = t.admin.floatingBtn;
   const [settings, setSettings] = useState<ButtonSettings | null>(() => {
-    const cached = localStorage.getItem("zapmax_admin_floating_btn");
+    const cached = localStorage.getItem("zapd2m_admin_floating_btn");
     return cached ? JSON.parse(cached) : null;
   });
   const [loading, setLoading] = useState(false);
@@ -60,7 +60,7 @@ export default function FloatingButtonTab() {
       const json = await callAdmin("floating-btn-get");
       const s = json.data ? json.data : { id: "", ...defaults };
       setSettings(s);
-      localStorage.setItem("zapmax_admin_floating_btn", JSON.stringify(s));
+      localStorage.setItem("zapd2m_admin_floating_btn", JSON.stringify(s));
     } catch { setSettings({ id: "", ...defaults }); }
     setLoading(false);
   };
@@ -80,7 +80,7 @@ export default function FloatingButtonTab() {
       if (json.success) {
         const s = json.data || settings;
         setSettings(s);
-        localStorage.setItem("zapmax_admin_floating_btn", JSON.stringify(s));
+        localStorage.setItem("zapd2m_admin_floating_btn", JSON.stringify(s));
         toast.success(f.savedOk);
       } else toast.error(f.saveError);
     } catch { toast.error(f.saveError); }

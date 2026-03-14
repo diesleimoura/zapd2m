@@ -66,7 +66,7 @@ export default function UsersTab() {
   const u = t.admin.users;
   const statusBadge = useStatusBadge();
   const [users, setUsers] = useState<AdminUser[]>(() => {
-    const cached = localStorage.getItem("zapmax_admin_users");
+    const cached = localStorage.getItem("zapd2m_admin_users");
     return cached ? JSON.parse(cached) : [];
   });
   const [loading, setLoading] = useState(false);
@@ -106,7 +106,7 @@ export default function UsersTab() {
           lastActive: formatLastActive(usr.lastActive),
         }));
         setUsers(udata);
-        localStorage.setItem("zapmax_admin_users", JSON.stringify(udata));
+        localStorage.setItem("zapd2m_admin_users", JSON.stringify(udata));
       }
     } catch (e) {
       console.error("Error fetching users:", e);

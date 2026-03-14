@@ -5,7 +5,7 @@ import { Cookie } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/contexts/LanguageContext";
 
-const COOKIE_KEY = "zapmax_cookie_consent";
+const COOKIE_KEY = "zapd2m_cookie_consent";
 
 export function CookieConsent() {
   const [visible, setVisible] = useState(false);

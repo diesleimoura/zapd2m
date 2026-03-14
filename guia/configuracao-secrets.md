@@ -1,6 +1,6 @@
-# Configuração de Secrets — ZapMax
+# Configuração de Secrets — zapd2m
 
-Este guia explica como configurar os secrets (variáveis de ambiente seguras) necessários para o funcionamento do ZapMax em um projeto Supabase.
+Este guia explica como configurar os secrets (variáveis de ambiente seguras) necessários para o funcionamento do zapd2m em um projeto Supabase.
 
 ---
 

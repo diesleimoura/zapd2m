@@ -210,7 +210,7 @@ export default {
     upgradeDesc: "Upgrade to unlock more features.",
     subscribe: "Subscribe Now",
     completeSetup: "Complete your setup",
-    completeSetupDesc: "ZapMax works best when you complete these steps:",
+    completeSetupDesc: "zapd2m works best when you complete these steps:",
     setupSteps: {
       whatsapp: { label: "Connect WhatsApp", action: "Connect" },
       business: { label: "Business data", action: "Configure" },
@@ -553,7 +553,7 @@ export default {
 
   howToUse: {
     title: "How to Use",
-    subtitle: "Complete guide to get the most out of ZapMax",
+    subtitle: "Complete guide to get the most out of zapd2m",
     supportCTA: "Still have questions? Contact our support!",
     talkToSupport: "Talk to support",
     sectionLabel: "Section",
@@ -1198,13 +1198,13 @@ export default {
     questions: "Questions about our terms? Contact us.",
     backHome: "Back to home",
     sections: [
-      { title: "1. Acceptance of Terms", content: "By accessing and using the ZapMax platform, you agree to these Terms of Use. If you do not agree with any of the terms, do not use our services." },
-      { title: "2. Service Description", content: "ZapMax is a WhatsApp automation and customer service management platform, offering features such as:\n• AI-powered chatbot\n• Conversation and contact management\n• Scheduling and automatic reminders\n• Metrics dashboard and reports\n• Kanban tracking board" },
+      { title: "1. Acceptance of Terms", content: "By accessing and using the zapd2m platform, you agree to these Terms of Use. If you do not agree with any of the terms, do not use our services." },
+      { title: "2. Service Description", content: "zapd2m is a WhatsApp automation and customer service management platform, offering features such as:\n• AI-powered chatbot\n• Conversation and contact management\n• Scheduling and automatic reminders\n• Metrics dashboard and reports\n• Kanban tracking board" },
       { title: "3. Registration and Account", content: "To use the platform, you must create an account with accurate and up-to-date information. You are responsible for maintaining the confidentiality of your credentials and all activities performed under your account." },
       { title: "4. Acceptable Use", content: "You agree to use the platform lawfully and ethically. It is prohibited to:\n• Send spam or unsolicited bulk messages\n• Use the service for illegal activities\n• Attempt to access other users' accounts\n• Reverse engineer or compromise the platform's security\n• Violate third-party intellectual property rights" },
       { title: "5. Plans and Payments", content: "Plans and pricing are available on the platform. Payment must be made according to the contracted plan conditions. We reserve the right to change prices with prior notice." },
-      { title: "6. Intellectual Property", content: "All platform content, including source code, design, logos, text, and features, is the exclusive property of ZapMax and is protected by intellectual property laws." },
-      { title: "7. Limitation of Liability", content: "ZapMax is not responsible for:\n• Temporary service interruptions\n• Content of messages sent by users\n• Business decisions based on platform data\n• Indirect or consequential damages from use" },
+      { title: "6. Intellectual Property", content: "All platform content, including source code, design, logos, text, and features, is the exclusive property of zapd2m and is protected by intellectual property laws." },
+      { title: "7. Limitation of Liability", content: "zapd2m is not responsible for:\n• Temporary service interruptions\n• Content of messages sent by users\n• Business decisions based on platform data\n• Indirect or consequential damages from use" },
       { title: "8. Suspension and Cancellation", content: "We reserve the right to suspend or cancel accounts that violate these terms. Users can cancel their account at any time through the settings." },
       { title: "9. Changes to Terms", content: "We may update these Terms periodically. Significant changes will be communicated via email or platform notification." },
       { title: "10. Jurisdiction and Law", content: "These Terms are governed by the applicable laws in your jurisdiction. Any disputes will be submitted to the competent court." },

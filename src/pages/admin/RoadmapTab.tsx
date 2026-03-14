@@ -87,15 +87,15 @@ export default function RoadmapTab() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [localItems, setLocalItems] = useState<RoadmapItem[]>(() => {
-    const cached = localStorage.getItem("zapmax_admin_roadmap_items");
+    const cached = localStorage.getItem("zapd2m_admin_roadmap_items");
     return cached ? JSON.parse(cached) : [];
   });
   const [originalItems, setOriginalItems] = useState<RoadmapItem[]>(() => {
-    const cached = localStorage.getItem("zapmax_admin_roadmap_items");
+    const cached = localStorage.getItem("zapd2m_admin_roadmap_items");
     return cached ? JSON.parse(cached) : [];
   });
   const [voteCounts, setVoteCounts] = useState<Record<string, number>>(() => {
-    const cached = localStorage.getItem("zapmax_admin_roadmap_votes");
+    const cached = localStorage.getItem("zapd2m_admin_roadmap_votes");
     return cached ? JSON.parse(cached) : {};
   });
 
@@ -113,7 +113,7 @@ export default function RoadmapTab() {
       if (json.success && json.data) {
         setLocalItems(json.data);
         setOriginalItems(json.data);
-        localStorage.setItem("zapmax_admin_roadmap_items", JSON.stringify(json.data));
+        localStorage.setItem("zapd2m_admin_roadmap_items", JSON.stringify(json.data));
       }
     } catch (e) { console.error("Failed to load roadmap:", e); }
     setLoading(false);
@@ -124,7 +124,7 @@ export default function RoadmapTab() {
       const json = await callAdmin("roadmap-vote-counts");
       if (json.success && json.data) {
         setVoteCounts(json.data);
-        localStorage.setItem("zapmax_admin_roadmap_votes", JSON.stringify(json.data));
+        localStorage.setItem("zapd2m_admin_roadmap_votes", JSON.stringify(json.data));
       }
     } catch {}
   }, []);

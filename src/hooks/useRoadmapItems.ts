@@ -16,7 +16,7 @@ export interface RoadmapItem {
 
 export function useRoadmapItems() {
   const [items, setItems] = useState<RoadmapItem[]>(() => {
-    const cached = localStorage.getItem("zapmax_roadmap_items");
+    const cached = localStorage.getItem("zapd2m_roadmap_items");
     return cached ? JSON.parse(cached) : [];
   });
   const [loading, setLoading] = useState(false);
@@ -29,7 +29,7 @@ export function useRoadmapItems() {
       });
       if (!error && data?.success && data.data) {
         setItems(data.data as RoadmapItem[]);
-        localStorage.setItem("zapmax_roadmap_items", JSON.stringify(data.data));
+        localStorage.setItem("zapd2m_roadmap_items", JSON.stringify(data.data));
       }
     } catch (e) {
       console.error("Failed to fetch roadmap items:", e);

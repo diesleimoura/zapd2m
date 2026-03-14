@@ -105,7 +105,7 @@ Execute o comando substituindo pelo seu Project ID:
 supabase functions deploy --project-ref SEU_PROJECT_ID
 ```
 
-Esse comando fará o deploy de todas as **Edge Functions do projeto ZapMax**.
+Esse comando fará o deploy de todas as **Edge Functions do projeto zapd2m**.
 
 Aguarde até que o processo seja finalizado.
 

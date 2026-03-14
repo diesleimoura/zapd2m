@@ -1,6 +1,6 @@
 # Subindo o Projeto para uma VPS – Guia em Texto
 
-Neste guia você aprenderá como hospedar o **ZapMax em uma VPS**, configurar o domínio, realizar o deploy da aplicação e criar a primeira conta administradora do sistema.
+Neste guia você aprenderá como hospedar o **zapd2m em uma VPS**, configurar o domínio, realizar o deploy da aplicação e criar a primeira conta administradora do sistema.
 
 ---
 
@@ -104,7 +104,7 @@ No Deploy Manager você também deverá informar o nome da pasta onde o sistema 
 Exemplo:
 
 ```
-zapmax
+zapd2m
 ```
 
 Esse será o diretório onde os arquivos da aplicação ficarão armazenados na VPS.
@@ -168,7 +168,7 @@ Após finalizar o deploy, será exibida a **URL da aplicação**.
 
 Copie a URL e abra no navegador.
 
-Se tudo estiver correto, a aplicação **ZapMax estará funcionando**.
+Se tudo estiver correto, a aplicação **zapd2m estará funcionando**.
 
 ---
 
@@ -310,7 +310,7 @@ Entrar
 
 Após concluir essas etapas:
 
-- O **ZapMax estará hospedado na VPS**
+- O **zapd2m estará hospedado na VPS**
 - O **domínio estará configurado**
 - O **SSL estará ativo**
 - O **sistema estará acessível pela internet**

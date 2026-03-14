@@ -1,4 +1,4 @@
-# Changelog - ZapMax
+# Changelog - zapd2m
 
 Todas as mudanças relevantes deste projeto serão documentadas neste arquivo.
 
@@ -79,4 +79,4 @@ Todas as mudanças relevantes deste projeto serão documentadas neste arquivo.
 
 ---
 
-_ZapMax - afCode_
+_zapd2m - afCode_

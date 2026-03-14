@@ -240,7 +240,7 @@ export default function Landing() {
             <span>•</span>
             <Link to="/termos" className="hover:text-foreground transition-colors">{(t.landing as any).footerTerms}</Link>
           </div>
-          <p>© {new Date().getFullYear()} ZapMax. {t.landing.footer}</p>
+          <p>© {new Date().getFullYear()} zapd2m. {t.landing.footer}</p>
         </div>
       </footer>
       <FloatingWhatsAppButton />

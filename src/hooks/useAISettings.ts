@@ -37,7 +37,7 @@ const defaults: AISettings = {
 export function useAISettings() {
   const { user } = useAuth();
   const [settings, setSettings] = useState<AISettings>(() => {
-    const cached = localStorage.getItem("zapmax_ai_settings");
+    const cached = localStorage.getItem("zapd2m_ai_settings");
     return cached ? JSON.parse(cached) : defaults;
   });
   const [loading, setLoading] = useState(false);
@@ -69,7 +69,7 @@ export function useAISettings() {
           openai_model: d.openai_model || defaults.openai_model,
         };
         setSettings(newSettings);
-        localStorage.setItem("zapmax_ai_settings", JSON.stringify(newSettings));
+        localStorage.setItem("zapd2m_ai_settings", JSON.stringify(newSettings));
       }
       setLoading(false);
     };
@@ -87,7 +87,7 @@ export function useAISettings() {
       body: { _action: "ai-settings-upsert", ...finalSettings },
     });
     if (!error && data?.success) {
-      localStorage.setItem("zapmax_ai_settings", JSON.stringify(finalSettings));
+      localStorage.setItem("zapd2m_ai_settings", JSON.stringify(finalSettings));
     }
     setSaving(false);
     return !error && data?.success;

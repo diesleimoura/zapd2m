@@ -41,7 +41,7 @@ type RefreshOptions = {
 export function useConversations() {
   const { user } = useAuth();
   const [conversations, setConversations] = useState<Conversation[]>(() => {
-    const cached = localStorage.getItem("zapmax_conversations");
+    const cached = localStorage.getItem("zapd2m_conversations");
     return cached ? JSON.parse(cached) : [];
   });
   const [loading, setLoading] = useState(false);
@@ -68,7 +68,7 @@ export function useConversations() {
           contact: c.contact || { id: c.contact_id, name: "Desconhecido", phone: "", avatar_url: null },
         }));
         setConversations(list);
-        localStorage.setItem("zapmax_conversations", JSON.stringify(list));
+        localStorage.setItem("zapd2m_conversations", JSON.stringify(list));
       }
     } catch (error) {
       console.error("Unexpected error fetching conversations:", error);
@@ -123,7 +123,7 @@ export function useConversations() {
 export function useMessages(conversationId: string | null) {
   const [messages, setMessages] = useState<Message[]>(() => {
     if (!conversationId) return [];
-    const cached = localStorage.getItem(`zapmax_messages_${conversationId}`);
+    const cached = localStorage.getItem(`zapd2m_messages_${conversationId}`);
     return cached ? JSON.parse(cached) : [];
   });
   const [loading, setLoading] = useState(false);
@@ -151,7 +151,7 @@ export function useMessages(conversationId: string | null) {
       } else if (data?.success) {
         setMessages(data.data || []);
         if (conversationId) {
-          localStorage.setItem(`zapmax_messages_${conversationId}`, JSON.stringify(data.data || []));
+          localStorage.setItem(`zapd2m_messages_${conversationId}`, JSON.stringify(data.data || []));
         }
       }
     } catch (error) {

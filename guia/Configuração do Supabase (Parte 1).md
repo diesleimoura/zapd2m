@@ -1,6 +1,6 @@
 # Configuração do Supabase (Parte 1) – Guia em Texto
 
-Neste guia você aprenderá como configurar o **Supabase** para utilizar o sistema **ZapMax**. 
+Neste guia você aprenderá como configurar o **Supabase** para utilizar o sistema **zapd2m**. 
 O processo envolve baixar o código fonte, configurar o ambiente local, criar um projeto no Supabase e realizar o deploy das migrations e Edge Functions.
 
 ---
@@ -68,7 +68,7 @@ No plano gratuito é possível criar até **2 projetos**.
 
 ---
 
-# 4. Criando o Projeto ZapMax
+# 4. Criando o Projeto zapd2m
 
 Durante a criação do projeto você deverá preencher:
 
@@ -76,7 +76,7 @@ Nome do projeto
 Exemplo:
 
 ```
-zapmax
+zapd2m
 ```
 
 Defina também:

@@ -20,7 +20,7 @@ export default function SystemSettingsTab() {
   const { t } = useLanguage();
   const s = t.admin.system;
   const [toggles, setToggles] = useState<SystemToggles>(() => {
-    const cached = localStorage.getItem("zapmax_admin_system_settings");
+    const cached = localStorage.getItem("zapd2m_admin_system_settings");
     return cached ? JSON.parse(cached) : { registration: true, autoTrial: true, detailedLogs: false };
   });
   const [hasChanges, setHasChanges] = useState(false);
@@ -50,7 +50,7 @@ export default function SystemSettingsTab() {
         const d = json.data;
         const newToggles = { registration: d.registration ?? true, autoTrial: d.auto_trial ?? true, detailedLogs: d.detailed_logs ?? false };
         setToggles(newToggles);
-        localStorage.setItem("zapmax_admin_system_settings", JSON.stringify(newToggles));
+        localStorage.setItem("zapd2m_admin_system_settings", JSON.stringify(newToggles));
       }
     } catch (e) { console.error("Failed to load settings:", e); }
     finally { setLoading(false); }
@@ -65,7 +65,7 @@ export default function SystemSettingsTab() {
       if (json.success) {
         setHasChanges(false);
         toast.success(s.savedOk);
-        localStorage.setItem("zapmax_admin_system_settings", JSON.stringify(toggles));
+        localStorage.setItem("zapd2m_admin_system_settings", JSON.stringify(toggles));
       } else toast.error(s.saveError);
     } catch { toast.error(s.saveError); }
     finally { setSaving(false); }

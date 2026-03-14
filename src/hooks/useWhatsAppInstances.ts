@@ -15,11 +15,11 @@ export interface WhatsAppInstance {
 
 export function useWhatsAppInstances() {
   const [instances, setInstances] = useState<WhatsAppInstance[]>(() => {
-    const cached = localStorage.getItem("zapmax_whatsapp_instances");
+    const cached = localStorage.getItem("zapd2m_whatsapp_instances");
     return cached ? JSON.parse(cached) : [];
   });
   const [loading, setLoading] = useState(false);
-  const [hasFetched, setHasFetched] = useState(() => !!localStorage.getItem("zapmax_whatsapp_instances"));
+  const [hasFetched, setHasFetched] = useState(() => !!localStorage.getItem("zapd2m_whatsapp_instances"));
 
   const fetchInstances = useCallback(async () => {
     // setLoading(true);
@@ -35,7 +35,7 @@ export function useWhatsAppInstances() {
     if (data?.success) {
       const list: WhatsAppInstance[] = data.data || [];
       setInstances(list);
-      localStorage.setItem("zapmax_whatsapp_instances", JSON.stringify(list));
+      localStorage.setItem("zapd2m_whatsapp_instances", JSON.stringify(list));
       
       // Auto-check status for instances pending sync (status/phone)
       for (const inst of list) {
@@ -57,7 +57,7 @@ export function useWhatsAppInstances() {
                 const updated = prev.map(i =>
                   i.id === inst.id ? { ...i, status: nextStatus, phone: nextPhone } : i
                 );
-                localStorage.setItem("zapmax_whatsapp_instances", JSON.stringify(updated));
+                localStorage.setItem("zapd2m_whatsapp_instances", JSON.stringify(updated));
                 return updated;
               });
             }

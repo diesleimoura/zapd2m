@@ -18,7 +18,7 @@ export interface Contact {
 export function useContacts() {
   const { user } = useAuth();
   const [contacts, setContacts] = useState<Contact[]>(() => {
-    const cached = localStorage.getItem("zapmax_contacts");
+    const cached = localStorage.getItem("zapd2m_contacts");
     return cached ? JSON.parse(cached) : [];
   });
   const [loading, setLoading] = useState(false);
@@ -33,7 +33,7 @@ export function useContacts() {
       console.error("Error fetching contacts:", error);
     } else if (data?.success) {
       setContacts(data.data || []);
-      localStorage.setItem("zapmax_contacts", JSON.stringify(data.data || []));
+      localStorage.setItem("zapd2m_contacts", JSON.stringify(data.data || []));
     }
     setLoading(false);
   }, [user]);

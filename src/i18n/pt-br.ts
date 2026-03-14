@@ -210,7 +210,7 @@ export default {
     upgradeDesc: "Faça upgrade para desbloquear mais recursos.",
     subscribe: "Assinar Agora",
     completeSetup: "Complete sua configuração",
-    completeSetupDesc: "O ZapMax funciona melhor quando você completa estes passos:",
+    completeSetupDesc: "O zapd2m funciona melhor quando você completa estes passos:",
     setupSteps: {
       whatsapp: { label: "Conectar WhatsApp", action: "Conectar" },
       business: { label: "Dados da empresa", action: "Configurar" },
@@ -553,7 +553,7 @@ export default {
 
   howToUse: {
     title: "Como Usar",
-    subtitle: "Guia completo para aproveitar ao máximo o ZapMax",
+    subtitle: "Guia completo para aproveitar ao máximo o zapd2m",
     supportCTA: "Ainda tem dúvidas? Entre em contato com nosso suporte!",
     talkToSupport: "Falar com suporte",
     sectionLabel: "Seção",
@@ -1198,13 +1198,13 @@ export default {
     questions: "Dúvidas sobre nossos termos? Entre em contato conosco.",
     backHome: "Voltar ao início",
     sections: [
-      { title: "1. Aceitação dos Termos", content: "Ao acessar e utilizar a plataforma ZapMax, você concorda com estes Termos de Uso. Se não concordar com algum dos termos, não utilize nossos serviços." },
-      { title: "2. Descrição do Serviço", content: "A ZapMax é uma plataforma de automação e gestão de atendimento via WhatsApp, oferecendo funcionalidades como:\n• Chatbot com inteligência artificial\n• Gestão de conversas e contatos\n• Agendamentos e lembretes automáticos\n• Painel de métricas e relatórios\n• Kanban de acompanhamento" },
+      { title: "1. Aceitação dos Termos", content: "Ao acessar e utilizar a plataforma zapd2m, você concorda com estes Termos de Uso. Se não concordar com algum dos termos, não utilize nossos serviços." },
+      { title: "2. Descrição do Serviço", content: "A zapd2m é uma plataforma de automação e gestão de atendimento via WhatsApp, oferecendo funcionalidades como:\n• Chatbot com inteligência artificial\n• Gestão de conversas e contatos\n• Agendamentos e lembretes automáticos\n• Painel de métricas e relatórios\n• Kanban de acompanhamento" },
       { title: "3. Cadastro e Conta", content: "Para utilizar a plataforma, é necessário criar uma conta fornecendo informações verdadeiras e atualizadas. Você é responsável por manter a confidencialidade de suas credenciais de acesso e por todas as atividades realizadas em sua conta." },
       { title: "4. Uso Aceitável", content: "Você se compromete a utilizar a plataforma de forma lícita e ética. É proibido:\n• Enviar spam ou mensagens em massa não solicitadas\n• Utilizar o serviço para atividades ilegais\n• Tentar acessar contas de outros usuários\n• Realizar engenharia reversa ou comprometer a segurança da plataforma\n• Violar direitos de propriedade intelectual de terceiros" },
       { title: "5. Planos e Pagamentos", content: "Os planos e preços estão disponíveis na plataforma. O pagamento deve ser realizado conforme as condições do plano contratado. Reservamo-nos o direito de alterar preços mediante aviso prévio." },
-      { title: "6. Propriedade Intelectual", content: "Todo o conteúdo da plataforma, incluindo código-fonte, design, logotipos, textos e funcionalidades, é de propriedade exclusiva da ZapMax e está protegido por leis de propriedade intelectual." },
-      { title: "7. Limitação de Responsabilidade", content: "A ZapMax não se responsabiliza por:\n• Interrupções temporárias no serviço\n• Conteúdo das mensagens enviadas pelos usuários\n• Decisões comerciais tomadas com base nos dados da plataforma\n• Danos indiretos ou consequenciais decorrentes do uso" },
+      { title: "6. Propriedade Intelectual", content: "Todo o conteúdo da plataforma, incluindo código-fonte, design, logotipos, textos e funcionalidades, é de propriedade exclusiva da zapd2m e está protegido por leis de propriedade intelectual." },
+      { title: "7. Limitação de Responsabilidade", content: "A zapd2m não se responsabiliza por:\n• Interrupções temporárias no serviço\n• Conteúdo das mensagens enviadas pelos usuários\n• Decisões comerciais tomadas com base nos dados da plataforma\n• Danos indiretos ou consequenciais decorrentes do uso" },
       { title: "8. Suspensão e Cancelamento", content: "Reservamo-nos o direito de suspender ou cancelar contas que violem estes termos. O usuário pode cancelar sua conta a qualquer momento através das configurações." },
       { title: "9. Alterações nos Termos", content: "Podemos atualizar estes Termos periodicamente. Mudanças significativas serão comunicadas por email ou notificação na plataforma." },
       { title: "10. Foro e Legislação", content: "Estes Termos são regidos pelas leis da República Federativa do Brasil. Qualquer disputa será submetida ao foro da comarca de domicílio do usuário." },

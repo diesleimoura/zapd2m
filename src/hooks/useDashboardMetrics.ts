@@ -40,7 +40,7 @@ export function useDashboardMetrics() {
   const { user } = useAuth();
   const [period, setPeriod] = useState<PeriodFilter>("all");
   const [metrics, setMetrics] = useState<DashboardMetrics>(() => {
-    const cached = localStorage.getItem("zapmax_dashboard_metrics");
+    const cached = localStorage.getItem("zapd2m_dashboard_metrics");
     return cached ? JSON.parse(cached) : {
       totalConversations: 0, totalMessages: 0, activeInstances: 0,
       totalContacts: 0, pendingSchedules: 0, inboundMessages: 0,
@@ -48,7 +48,7 @@ export function useDashboardMetrics() {
     };
   });
   const [chartData, setChartData] = useState<ChartDataPoint[]>(() => {
-    const cached = localStorage.getItem("zapmax_dashboard_chart");
+    const cached = localStorage.getItem("zapd2m_dashboard_chart");
     return cached ? JSON.parse(cached) : [];
   });
   const [loading, setLoading] = useState(false);
@@ -71,8 +71,8 @@ export function useDashboardMetrics() {
     if (!error && data?.success) {
       setMetrics(data.data.metrics);
       setChartData(data.data.chartData || []);
-      localStorage.setItem("zapmax_dashboard_metrics", JSON.stringify(data.data.metrics));
-      localStorage.setItem("zapmax_dashboard_chart", JSON.stringify(data.data.chartData || []));
+      localStorage.setItem("zapd2m_dashboard_metrics", JSON.stringify(data.data.metrics));
+      localStorage.setItem("zapd2m_dashboard_chart", JSON.stringify(data.data.chartData || []));
     }
 
     setLoading(false);
