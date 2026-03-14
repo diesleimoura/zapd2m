@@ -16,12 +16,6 @@ async function generateAIResponse(
   incomingMediaType: string | null,
 ) {
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      console.error("LOVABLE_API_KEY not configured, skipping auto-response");
-      return;
-    }
-
     // Check if AI is enabled
     const { data: aiSettings } = await supabaseAdmin
       .from("ai_settings")
@@ -31,6 +25,14 @@ async function generateAIResponse(
 
     if (!aiSettings || aiSettings.ai_enabled === false) {
       console.log("AI disabled for tenant", tenantId);
+      return;
+    }
+
+    const openaiApiKey = aiSettings.openai_api_key;
+    const openaiModel = aiSettings.openai_model || "gpt-4o-mini";
+
+    if (!openaiApiKey) {
+      console.error("OpenAI API Key not configured for tenant", tenantId, "skipping auto-response");
       return;
     }
 
@@ -246,7 +248,16 @@ async function generateAIResponse(
     systemPrompt += `- Use o ID do contato atual: ${contactPhone} (busque pelo telefone).\n`;
     systemPrompt += `- A data de hoje é: ${new Date().toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })} (${new Date().toISOString().split("T")[0]}).\n\n`;
 
-    systemPrompt += "\n## Regras Finais\n- Responda APENAS com base nas informações fornecidas.\n- Se não souber a resposta, diga que vai verificar e retornar.\n- Mantenha respostas curtas e objetivas para WhatsApp.\n- Responda sempre em português brasileiro.\n- NUNCA use formatação Markdown (asteriscos duplos **, hashtags #, traços -, crases, etc).\n- Para destacar algo no WhatsApp, use apenas UM asterisco de cada lado: *assim*.\n- Escreva texto limpo e direto, sem qualquer marcação especial.";
+    systemPrompt += "\n## Regras Finais\n" +
+      "- Priorize SEMPRE as informações da 'Base de Conhecimento' acima para responder.\n" +
+      "- Se a informação NÃO estiver na base de conhecimento ou nos serviços, informe educadamente que vai verificar com um atendente humano.\n" +
+      "- Responda de forma natural a saudações (olá, bom dia, etc), mas direcione o assunto para o suporte baseado nos documentos ou agendamento.\n" +
+      "- Mantenha respostas curtas e objetivas, ideais para leitura no celular (WhatsApp).\n" +
+      "- Use Português do Brasil.\n" +
+      "- IMPORTANTE: O WhatsApp NÃO suporta formatação Markdown complexa (hashtags #, listas com traço -, blocos de código, etc).\n" +
+      "- Para destacar palavras, use apenas UM asterisco de cada lado: *exemplo*. NUNCA use dois asteriscos **.\n" +
+      "- Não use negrito em frases longas, apenas em palavras-chave.\n" +
+      "- Escreva texto limpo, direto e sem marcações de cabeçalho.";
 
     // Define scheduling tools for function calling
     const tools = [
@@ -359,14 +370,14 @@ async function generateAIResponse(
       ...chatMessages,
     ];
 
-    let aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    let aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${openaiApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: openaiModel,
         messages: aiMessages,
         tools,
         tool_choice: "auto",
@@ -507,14 +518,14 @@ async function generateAIResponse(
       }
 
       // Call AI again with tool results
-      aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      aiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          Authorization: `Bearer ${openaiApiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: "google/gemini-3-flash-preview",
+          model: openaiModel,
           messages: aiMessages,
           tools,
           tool_choice: "auto",

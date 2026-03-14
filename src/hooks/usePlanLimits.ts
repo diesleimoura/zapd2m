@@ -40,14 +40,26 @@ export interface SubscriptionInfo {
 export function usePlanLimits() {
   const { user } = useAuth();
   const userId = user?.id;
-  const [loading, setLoading] = useState(true);
-  const [hasPlan, setHasPlan] = useState(false);
-  const [plan, setPlan] = useState<PlanInfo | null>(null);
-  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null);
-  const [usage, setUsage] = useState<PlanUsage | null>(null);
-  const [trialBlocked, setTrialBlocked] = useState(false);
-  const [trialDaysLeft, setTrialDaysLeft] = useState<number | null>(null);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [hasPlan, setHasPlan] = useState(() => localStorage.getItem("zapmax_has_plan") === "true");
+  const [plan, setPlan] = useState<PlanInfo | null>(() => {
+    const cached = localStorage.getItem("zapmax_plan_info");
+    return cached ? JSON.parse(cached) : null;
+  });
+  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(() => {
+    const cached = localStorage.getItem("zapmax_subscription_info");
+    return cached ? JSON.parse(cached) : null;
+  });
+  const [usage, setUsage] = useState<PlanUsage | null>(() => {
+    const cached = localStorage.getItem("zapmax_plan_usage");
+    return cached ? JSON.parse(cached) : null;
+  });
+  const [trialBlocked, setTrialBlocked] = useState(() => localStorage.getItem("zapmax_trial_blocked") === "true");
+  const [trialDaysLeft, setTrialDaysLeft] = useState<number | null>(() => {
+    const cached = localStorage.getItem("zapmax_trial_days_left");
+    return cached ? parseInt(cached) : null;
+  });
+  const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem("zapmax_is_admin_plan") === "true");
   const fetchedRef = useRef<string | null>(null);
 
   const applyData = (data: any) => {
@@ -58,6 +70,14 @@ export function usePlanLimits() {
     setTrialBlocked(!!data.trial_blocked);
     setTrialDaysLeft(data.trial_days_left ?? null);
     setIsAdmin(!!data.is_admin);
+
+    localStorage.setItem("zapmax_has_plan", String(data.has_plan));
+    if (data.plan) localStorage.setItem("zapmax_plan_info", JSON.stringify(data.plan));
+    if (data.subscription) localStorage.setItem("zapmax_subscription_info", JSON.stringify(data.subscription));
+    if (data.usage) localStorage.setItem("zapmax_plan_usage", JSON.stringify(data.usage));
+    localStorage.setItem("zapmax_trial_blocked", String(!!data.trial_blocked));
+    if (data.trial_days_left !== undefined) localStorage.setItem("zapmax_trial_days_left", String(data.trial_days_left));
+    localStorage.setItem("zapmax_is_admin_plan", String(!!data.is_admin));
   };
 
   useEffect(() => {
@@ -73,7 +93,8 @@ export function usePlanLimits() {
 
     let cancelled = false;
     const doFetch = async () => {
-      setLoading(true);
+      // Silent loading
+      // setLoading(true);
       try {
         const { data, error } = await supabase.functions.invoke("check-plan-limits", {
           method: "POST",
@@ -96,7 +117,7 @@ export function usePlanLimits() {
   const refetch = useCallback(async () => {
     if (!userId) return;
     fetchedRef.current = null;
-    setLoading(true);
+    // setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("check-plan-limits", {
         method: "POST",

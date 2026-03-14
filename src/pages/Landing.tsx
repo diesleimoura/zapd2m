@@ -39,6 +39,19 @@ export default function Landing() {
   const [plans, setPlans] = useState<LandingPlan[]>([]);
   const [plansLoading, setPlansLoading] = useState(true);
 
+  const scrollToSection = (id: string) => {
+    const element = document.getElementById(id);
+    if (element) {
+      const offset = 80;
+      const elementPosition = element.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - offset;
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth",
+      });
+    }
+  };
+
   const features = [
     { icon: Bot, title: t.landing.features.items.ai.title, description: t.landing.features.items.ai.desc },
     { icon: CalendarDays, title: t.landing.features.items.scheduling.title, description: t.landing.features.items.scheduling.desc },
@@ -84,9 +97,9 @@ export default function Landing() {
             <span className="text-xl font-bold">Zap<span className="text-primary">Max</span></span>
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
-            <a href="#features" className="hover:text-foreground transition-colors">{t.landing.nav.features}</a>
-            <a href="#pricing" className="hover:text-foreground transition-colors">{t.landing.nav.plans}</a>
-            <a href="#stats" className="hover:text-foreground transition-colors">{t.landing.nav.results}</a>
+            <button onClick={() => scrollToSection("features")} className="hover:text-foreground transition-colors">{t.landing.nav.features}</button>
+            <button onClick={() => scrollToSection("pricing")} className="hover:text-foreground transition-colors">{t.landing.nav.plans}</button>
+            <button onClick={() => scrollToSection("stats")} className="hover:text-foreground transition-colors">{t.landing.nav.results}</button>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <Button variant="ghost" size="sm" onClick={() => navigate("/login")}>{t.landing.nav.signIn}</Button>
@@ -162,7 +175,7 @@ export default function Landing() {
             <h2 className="text-3xl md:text-4xl font-bold">{t.landing.pricing.title.split("{highlight}")[0]}<span className="text-primary">{t.landing.pricing.title.split("{highlight}")[1]?.split("{/highlight}")[0]}</span>{t.landing.pricing.title.split("{/highlight}")[1]}</h2>
             <p className="text-muted-foreground mt-3">{t.landing.pricing.subtitle}</p>
           </motion.div>
-          {plansLoading ? (
+          {false ? (
             <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
           ) : (
             <motion.div variants={staggerContainer} initial="hidden" whileInView="visible" viewport={{ once: true, margin: "-50px" }} className={`grid gap-6 max-w-5xl mx-auto ${plans.length >= 3 ? "md:grid-cols-3" : plans.length === 2 ? "md:grid-cols-2" : "md:grid-cols-1"}`}>

@@ -24,7 +24,7 @@ export default function InstancesTab() {
   const i = t.admin.instances;
   const statusBadge = useStatusBadge();
   const [instances, setInstances] = useState<AdminInstance[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [refreshing, setRefreshing] = useState(false);
@@ -34,7 +34,7 @@ export default function InstancesTab() {
   const [pageSize, setPageSize] = useState(10);
 
   const fetchInstances = async () => {
-    setLoading(true);
+    // setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("admin-data?action=instances");
       if (error) throw error;
@@ -80,7 +80,8 @@ export default function InstancesTab() {
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paged = filtered.slice(page * pageSize, (page + 1) * pageSize);
 
-  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>;
+  // Silent loading
+  // if (loading) return ...;
 
   return (
     <div className="space-y-3 sm:space-y-4">

@@ -472,13 +472,7 @@ export default function Conversas() {
     closed: conversations.filter((c) => c.status === "closed").length,
   };
 
-  if (convLoading) {
-    return (
-      <div className="flex items-center justify-center h-[calc(100vh-3rem)]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+
 
   return (
     <div className="flex h-[calc(100vh-3rem)]">
@@ -809,11 +803,7 @@ export default function Conversas() {
 
           {/* Messages */}
           <div className="flex-1 overflow-auto p-4 space-y-1">
-            {msgLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-6 w-6 animate-spin text-primary" />
-              </div>
-            ) : messages.length === 0 ? (
+            {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
                 <MessageCircle className="h-12 w-12 mb-3 opacity-30" />
                 <p className="text-sm">{t.conversations.noMessages}</p>
@@ -823,19 +813,7 @@ export default function Conversas() {
             )}
 
             {/* AI Loading indicator */}
-            {aiLoading && !aiSuggestion && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="flex justify-end mb-2"
-              >
-                <div className="rounded-2xl px-4 py-3 bg-primary/10 border border-primary/20 flex items-center gap-2">
-                  <Sparkles className="h-3.5 w-3.5 text-primary animate-pulse" />
-                  <span className="text-xs text-primary">{t.conversations.generatingResponse}</span>
-                  <Loader2 className="h-3 w-3 animate-spin text-primary" />
-                </div>
-              </motion.div>
-            )}
+
 
             <div ref={messagesEndRef} />
           </div>

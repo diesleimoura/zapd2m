@@ -344,13 +344,8 @@ export default function Kanban() {
 
   const handleOpenChat = (convId: string) => navigate(`/conversas?id=${convId}`);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-[calc(100vh-3rem)]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
+  // Silent loading
+  // if (loading) { ... }
 
   return (
     <div className="p-2 sm:p-6 space-y-3 sm:space-y-4 w-full h-full">

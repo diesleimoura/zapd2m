@@ -162,7 +162,8 @@ export default {
       delete: "Delete",
       uploadTitle: "Add Document",
       dragDrop: "Drag and drop here or click to select",
-      formats: "PDF, TXT, DOCX — max 10 MB",
+      formats: "PDF, TXT, DOCX, MD, JSON — max 10 MB",
+      markdownHint: "💡 Tip: For better answers, structure your documents using Markdown headers (#), lists (-), and bold text (**).",
       docTitle: "Document title",
       docType: "Document type",
       types: {
