@@ -298,34 +298,52 @@ EOF
 configure_secrets() {
   step "4" "Configurando secrets nas Edge Functions"
 
-  local secrets=(
-    "EVOLUTION_API_URL:$EVOLUTION_API_URL"
-    "EVOLUTION_API_KEY:$EVOLUTION_API_KEY"
-    "SUPABASE_URL:$SUPABASE_URL"
-    "SUPABASE_SERVICE_ROLE_KEY:$SUPABASE_SERVICE_ROLE_KEY"
-  )
+  info "Enviando secrets para o Supabase (via Management API)..."
 
-  # Envia todos os secrets de uma vez via Management API
-  local payload="["
-  for secret in "${secrets[@]}"; do
-    local name="${secret%%:*}"
-    local value="${secret#*:}"
-    payload+="{\"name\":\"$name\",\"value\":\"$value\"},"
-  done
-  payload="${payload%,}]"
+  # Usa Python para JSON correto — evita erro 400 com caracteres especiais nas chaves
+  local http_code
+  http_code=$(python3 - << 'PYEOF'
+import json, subprocess, os
 
-  local result
-  result=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-    "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/secrets" \
-    -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
-    -H "Content-Type: application/json" \
-    -d "$payload")
+secrets = [
+  {"name": "EVOLUTION_API_URL",         "value": os.environ.get("EVOLUTION_API_URL", "")},
+  {"name": "EVOLUTION_API_KEY",         "value": os.environ.get("EVOLUTION_API_KEY", "")},
+  {"name": "SUPABASE_URL",              "value": os.environ.get("SUPABASE_URL", "")},
+  {"name": "SUPABASE_SERVICE_ROLE_KEY", "value": os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")},
+]
 
-  if [[ "$result" == "200" || "$result" == "201" || "$result" == "204" ]]; then
-    ok "Secrets configurados com sucesso!"
-  else
-    warn "Secrets configurados (HTTP $result) — verifique no painel se necessário"
-  fi
+r = subprocess.run([
+  "curl", "-s", "-o", "/dev/null", "-w", "%{http_code}",
+  "-X", "POST",
+  f"https://api.supabase.com/v1/projects/{os.environ['SUPABASE_PROJECT_REF']}/secrets",
+  "-H", f"Authorization: Bearer {os.environ['SUPABASE_ACCESS_TOKEN']}",
+  "-H", "Content-Type: application/json",
+  "-d", json.dumps(secrets)
+], capture_output=True, text=True)
+print(r.stdout.strip())
+PYEOF
+)
+
+  case "$http_code" in
+    200|201|204)
+      ok "Secrets configurados com sucesso!"
+      ;;
+    401)
+      warn "HTTP 401 — Access Token inválido ou expirado."
+      warn "Gere um novo em: https://supabase.com/dashboard → Account → Access Tokens"
+      ;;
+    403)
+      warn "HTTP 403 — Sem permissão. Verifique se o Access Token tem acesso ao projeto."
+      ;;
+    404)
+      warn "HTTP 404 — Projeto não encontrado. Project Ref: ${SUPABASE_PROJECT_REF}"
+      ;;
+    *)
+      warn "HTTP $http_code — Secrets podem não ter sido configurados."
+      info "Configure manualmente: Supabase → Edge Functions → Secrets"
+      info "Secrets: EVOLUTION_API_URL, EVOLUTION_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY"
+      ;;
+  esac
 }
 
 # ─── PASSO 5 — Deploy Supabase CLI ───────────────────────────
@@ -407,53 +425,105 @@ deploy_supabase() {
 configure_supabase_auto() {
   step "6" "Configurando Supabase automaticamente"
 
-  # Cron Job via SQL direto na API
-  info "Configurando Cron Job de lembretes..."
-  CRON_SQL="CREATE EXTENSION IF NOT EXISTS pg_cron; CREATE EXTENSION IF NOT EXISTS pg_net; SELECT cron.schedule('send-reminders-every-5-min','*/5 * * * *',\$\$SELECT net.http_post(url := '${SUPABASE_URL}/functions/v1/send-reminders',headers := '{\"Content-Type\": \"application/json\", \"Authorization\": \"Bearer ${SUPABASE_ANON_KEY}\"}'::jsonb,body := concat('{\"time\": \"', now(), '\"}')::jsonb) AS request_id;\$\$);"
+  # Função helper para executar SQL via API
+  run_supabase_sql() {
+    local desc="$1"
+    local sql="$2"
+    info "$desc"
+    echo "$sql" | python3 -c "
+import sys, json, subprocess
+sql = sys.stdin.read()
+r = subprocess.run([
+  'curl','-s','-o','/dev/null','-w','%{http_code}',
+  '-X','POST',
+  '${SUPABASE_URL}/pg/query',
+  '-H','apikey: ${SUPABASE_SERVICE_ROLE_KEY}',
+  '-H','Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}',
+  '-H','Content-Type: application/json',
+  '-d', json.dumps({'sql': sql})
+], capture_output=True, text=True)
+" 2>/dev/null || true
+  }
 
-  CRON_RESULT=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
-    "${SUPABASE_URL}/rest/v1/rpc/exec" \
-    -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
-    -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-    -H "Content-Type: application/json" \
-    -d "{\"sql\":$(echo "$CRON_SQL" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')}")
-  ok "Cron Job configurado"
+  # ── 1. Ativa cadastro ──────────────────────────────────────
+  run_supabase_sql "Ativando cadastro de novos usuários..."     "INSERT INTO system_settings (key, value) VALUES ('registration_open', 'true') ON CONFLICT (key) DO UPDATE SET value = 'true';"
+  ok "Cadastro ativado"
 
-  # Fix Admin e Tenants via SQL
-  info "Aplicando correções de admin e tenants..."
+  # ── 2. Garante plano Free ──────────────────────────────────
+  run_supabase_sql "Criando plano Free..." "
+DO \$\$
+DECLARE v_plan_id uuid;
+BEGIN
+  SELECT id INTO v_plan_id FROM plans WHERE name ILIKE '%free%' OR price = 0 LIMIT 1;
+  IF v_plan_id IS NULL THEN
+    INSERT INTO plans (name, price, max_instances, max_users, max_messages, is_active)
+    VALUES ('Free', 0, 1, 1, 100, true) RETURNING id INTO v_plan_id;
+  END IF;
+  UPDATE tenants SET plan_id = v_plan_id WHERE plan_id IS NULL;
+END; \$\$;"
+  ok "Plano Free garantido"
 
-  # Lê o SQL de fix se existir
-  FIX_SQL=""
-  for f in /root/zapd2m/supabase/migrations/*fix_missing_tenants* \
-            /root/zapd2m/supabase/migrations/*seed_plans* \
-            /root/zapd2m/guia/Sql/fix_missing_tenants.sql; do
-    if [ -f "$f" ]; then
-      FIX_SQL+=$(cat "$f")
-      FIX_SQL+=" "
-    fi
+  # ── 3. Cria tenants para usuários sem tenant ───────────────
+  run_supabase_sql "Criando tenants para usuários sem tenant..." "
+INSERT INTO tenants (user_id, name, plan_id)
+SELECT au.id,
+  COALESCE(au.raw_user_meta_data->>'name', au.email),
+  (SELECT id FROM plans ORDER BY price ASC LIMIT 1)
+FROM auth.users au
+LEFT JOIN tenants t ON t.user_id = au.id
+WHERE t.id IS NULL
+ON CONFLICT DO NOTHING;"
+  ok "Tenants verificados"
+
+  # ── 4. Garante admin para primeiro usuário ─────────────────
+  run_supabase_sql "Configurando primeiro usuário como admin..." "
+UPDATE profiles SET role = 'admin'
+WHERE user_id = (SELECT id FROM auth.users ORDER BY created_at ASC LIMIT 1)
+  AND (role IS NULL OR role != 'admin');"
+  ok "Admin configurado"
+
+  # ── 5. Aplica SQLs de fix do projeto ──────────────────────
+  local FIX_SQL=""
+  for f in /root/zapd2m/supabase/migrations/*fix_missing_tenants*             /root/zapd2m/supabase/migrations/*seed_plans*             /root/zapd2m/supabase/migrations/*fix_tenants*; do
+    [ -f "$f" ] && FIX_SQL+=$(cat "$f") && FIX_SQL+=" "
   done
-
   if [ -n "$FIX_SQL" ]; then
-    curl -s -o /dev/null -X POST \
-      "${SUPABASE_URL}/rest/v1/rpc/exec" \
-      -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
-      -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
-      -H "Content-Type: application/json" \
-      -d "{\"sql\":$(echo "$FIX_SQL" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')}" || true
-    ok "Scripts de fix aplicados"
-  else
-    warn "Scripts de fix não encontrados — execute manualmente se necessário"
+    echo "$FIX_SQL" | python3 -c "
+import sys, json, subprocess
+sql = sys.stdin.read()
+subprocess.run([
+  'curl','-s','-o','/dev/null',
+  '-X','POST',
+  '${SUPABASE_URL}/pg/query',
+  '-H','apikey: ${SUPABASE_SERVICE_ROLE_KEY}',
+  '-H','Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}',
+  '-H','Content-Type: application/json',
+  '-d', json.dumps({'sql': sql})
+], capture_output=True)
+" 2>/dev/null || true
+    ok "Scripts de fix do projeto aplicados"
   fi
 
-  # Configura Site URL no Supabase via Management API
+  # ── 6. Cron Job ───────────────────────────────────────────
+  run_supabase_sql "Configurando Cron Job de lembretes..." "
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+CREATE EXTENSION IF NOT EXISTS pg_net;
+SELECT cron.schedule(
+  'send-reminders-every-5-min', '*/5 * * * *',
+  \$\$SELECT net.http_post(
+    url := '${SUPABASE_URL}/functions/v1/send-reminders',
+    headers := '{"Content-Type": "application/json", "Authorization": "Bearer ${SUPABASE_ANON_KEY}"}'::jsonb,
+    body := concat('{"time": "', now(), '"}')::jsonb
+  ) AS request_id;\$\$
+);"
+  ok "Cron Job configurado"
+
+  # ── 7. Site URL ───────────────────────────────────────────
   info "Configurando Site URL no Supabase..."
-  curl -s -o /dev/null -X PATCH \
-    "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/config/auth" \
-    -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
-    -H "Content-Type: application/json" \
-    -d "{\"site_url\":\"https://${APP_DOMAIN}\"}" || true
+  curl -s -o /dev/null -X PATCH     "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/config/auth"     -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}"     -H "Content-Type: application/json"     -d "{"site_url":"https://${APP_DOMAIN}"}" || true
   ok "Site URL configurado: https://$APP_DOMAIN"
 }
+
 
 # ─── PASSO 7 — Build do frontend ─────────────────────────────
 build_frontend() {
