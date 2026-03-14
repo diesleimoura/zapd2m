@@ -117,7 +117,7 @@ export function AppSidebar() {
                 variants={textVariants}
                 className="text-lg font-bold text-foreground whitespace-nowrap overflow-hidden"
               >
-                Zap<span className="text-primary">Max</span>
+                zap<span className="text-primary">d2m</span>
               </motion.span>
             )}
           </AnimatePresence>

@@ -94,7 +94,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary"><MessageCircle className="h-5 w-5 text-primary-foreground" /></div>
-            <span className="text-xl font-bold">Zap<span className="text-primary">Max</span></span>
+            <span className="text-xl font-bold">zap<span className="text-primary">d2m</span></span>
           </div>
           <div className="hidden md:flex items-center gap-8 text-sm text-muted-foreground">
             <button onClick={() => scrollToSection("features")} className="hover:text-foreground transition-colors">{t.landing.nav.features}</button>
@@ -233,7 +233,7 @@ export default function Landing() {
         <div className="max-w-7xl mx-auto px-6 py-8 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
           <div className="flex items-center gap-2">
             <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary"><MessageCircle className="h-3.5 w-3.5 text-primary-foreground" /></div>
-            <span className="font-bold text-foreground">Zap<span className="text-primary">Max</span></span>
+            <span className="font-bold text-foreground">zap<span className="text-primary">d2m</span></span>
           </div>
           <div className="flex items-center gap-4">
             <Link to="/privacidade" className="hover:text-foreground transition-colors">{(t.landing as any).footerPrivacy}</Link>

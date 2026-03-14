@@ -118,7 +118,7 @@ export default function Cadastro() {
                 <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 260, damping: 20, delay: 0.3 }} className="flex h-10 w-10 items-center justify-center rounded-full bg-primary">
                   <MessageCircle className="h-5 w-5 text-primary-foreground" />
                 </motion.div>
-                <span className="text-2xl font-bold">Zap<span className="text-primary">Max</span></span>
+                <span className="text-2xl font-bold">zap<span className="text-primary">d2m</span></span>
               </div>
               <h1 className="text-xl font-bold">{t.register.createAccount}</h1>
               <p className="text-sm text-muted-foreground mt-1">{t.register.subtitle}</p>

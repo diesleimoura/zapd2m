@@ -45,7 +45,7 @@ export default function ResetPassword() {
             <div className="text-center mb-8">
               <div className="flex items-center justify-center gap-2 mb-4">
                 <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary"><MessageCircle className="h-5 w-5 text-primary-foreground" /></div>
-                <span className="text-2xl font-bold">Zap<span className="text-primary">Max</span></span>
+                <span className="text-2xl font-bold">zap<span className="text-primary">d2m</span></span>
               </div>
               <h1 className="text-xl font-bold">{t.resetPassword.title}</h1>
               <p className="text-sm text-muted-foreground mt-1">{t.resetPassword.subtitle}</p>
