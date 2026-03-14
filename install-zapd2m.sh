@@ -363,24 +363,25 @@ print(urllib.parse.quote('${SUPABASE_DB_PASSWORD}', safe=''))
   fi
   ok "Supabase CLI $(supabase --version 2>/dev/null | head -1)"
 
-  # ── Login e link ────────────────────────────────────────────
-  export SUPABASE_ACCESS_TOKEN="${SUPABASE_ACCESS_TOKEN}"
-  supabase login --no-browser 2>/dev/null || true
-  timeout 30 supabase link \
-    --project-ref "${SUPABASE_PROJECT_REF}" \
-    --password "${SUPABASE_DB_PASSWORD}" 2>/dev/null || true
+  # ── Login via token direto ─────────────────────────────────
+  info "Autenticando no Supabase CLI..."
+  echo "${SUPABASE_ACCESS_TOKEN}" | supabase login --token-stdin 2>/dev/null ||   SUPABASE_ACCESS_TOKEN="${SUPABASE_ACCESS_TOKEN}" supabase login --no-browser 2>/dev/null || true
+
+  # ── Link ao projeto ─────────────────────────────────────────
+  info "Vinculando ao projeto..."
+  timeout 30 supabase link     --project-ref "${SUPABASE_PROJECT_REF}"     --password "${SUPABASE_DB_PASSWORD}" 2>&1 | grep -v "^diff" | head -5 || true
   ok "Projeto vinculado"
 
-  # ── Configura Secrets via CLI (mais confiável que API REST) ─
+  # ── Configura Secrets via CLI ───────────────────────────────
   info "Configurando secrets via Supabase CLI..."
-  supabase secrets set \
-    EVOLUTION_API_URL="${EVOLUTION_API_URL}" \
-    EVOLUTION_API_KEY="${EVOLUTION_API_KEY}" \
-    SUPABASE_URL="${SUPABASE_URL}" \
-    SUPABASE_SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY}" \
-    --project-ref "${SUPABASE_PROJECT_REF}" 2>/dev/null && \
-    ok "Secrets configurados via CLI!" || \
-    warn "Falha ao configurar secrets — configure manualmente no Supabase"
+  local secrets_result
+  secrets_result=$(supabase secrets set     EVOLUTION_API_URL="${EVOLUTION_API_URL}"     EVOLUTION_API_KEY="${EVOLUTION_API_KEY}"     SUPABASE_URL="${SUPABASE_URL}"     SUPABASE_SERVICE_ROLE_KEY="${SUPABASE_SERVICE_ROLE_KEY}"     --project-ref "${SUPABASE_PROJECT_REF}" 2>&1)
+  if echo "$secrets_result" | grep -qi "error\|fail\|denied\|unauthorized"; then
+    warn "Secrets CLI falhou: $secrets_result"
+    warn "Configure manualmente: Supabase → Edge Functions → Secrets"
+  else
+    ok "Secrets configurados!"
+  fi
 
   # ── Deploy das Edge Functions ───────────────────────────────
   local FUNCTIONS=(
