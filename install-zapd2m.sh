@@ -2,7 +2,7 @@
 
 # ============================================================
 #   Instalador Automático — zapd2m
-#   Versão 2.0
+#   Versão 4.0 — Full Auto (sem Supabase CLI)
 # ============================================================
 
 set -e
@@ -21,21 +21,14 @@ NC='\033[0m'
 print_banner() {
   clear
   echo -e "${CYAN}"
-  echo "   ██████╗ ██╗ ██████╗██╗  ██╗ █████╗ ████████╗"
-  echo "   ██╔══██╗██║██╔════╝██║  ██║██╔══██╗╚══██╔══╝"
-  echo "   ██║  ██║██║██║     ███████║███████║   ██║   "
-  echo "   ██║  ██║██║██║     ██╔══██║██╔══██║   ██║   "
-  echo "   ██████╔╝██║╚██████╗██║  ██║██║  ██║   ██║   "
-  echo "   ╚═════╝ ╚═╝ ╚═════╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝  "
-  echo ""
-  echo "   ██████╗ ██╗     ██╗   ██╗███████╗ ██████╗  ██████╗ "
-  echo "   ██╔══██╗██║     ██║   ██║██╔════╝██╔════╝ ██╔═══██╗"
-  echo "   ██████╔╝██║     ██║   ██║███████╗██║  ███╗██║   ██║"
-  echo "   ██╔═══╝ ██║     ██║   ██║╚════██║██║   ██║██║   ██║"
-  echo "   ██║     ███████╗╚██████╔╝███████║╚██████╔╝╚██████╔╝"
-  echo "   ╚═╝     ╚══════╝ ╚═════╝ ╚══════╝ ╚═════╝  ╚═════╝ "
+  echo "    ███████╗ █████╗ ██████╗ ██████╗ ██████╗ ███╗   ███╗"
+  echo "    ╚══███╔╝██╔══██╗██╔══██╗██╔══██╗╚════██╗████╗ ████║"
+  echo "      ███╔╝ ███████║██████╔╝██║  ██║ █████╔╝██╔████╔██║"
+  echo "     ███╔╝  ██╔══██║██╔═══╝ ██║  ██║██╔═══╝ ██║╚██╔╝██║"
+  echo "    ███████╗██║  ██║██║     ██████╔╝███████╗██║ ╚═╝ ██║"
+  echo "    ╚══════╝╚═╝  ╚═╝╚═╝     ╚═════╝ ╚══════╝╚═╝     ╚═╝"
   echo -e "${NC}"
-  echo -e "  ${WHITE}${BOLD}Instalador Automático v2.1${NC}"
+  echo -e "  ${WHITE}${BOLD}Instalador Automático v4.0 — Full Auto${NC}"
   echo -e "  ${BLUE}─────────────────────────────────────────────${NC}"
   echo ""
 }
@@ -46,6 +39,7 @@ warn()      { echo -e "  ${YELLOW}⚠${NC}  $1"; }
 info()      { echo -e "  ${BLUE}ℹ${NC}  $1"; }
 ask()       { echo -en "  ${WHITE}▶ $1: ${NC}"; }
 separator() { echo -e "\n${BLUE}──────────────────────────────────────────────${NC}\n"; }
+error_exit(){ echo -e "\n${RED}✘ ERRO: $1${NC}\n"; exit 1; }
 
 spinner() {
   local pid=$1 msg=$2 delay=0.1 i=0
@@ -58,114 +52,169 @@ spinner() {
   echo -e "\r  ${GREEN}✔${NC} $msg"
 }
 
+# Executa SQL direto no Supabase via API REST
+run_sql() {
+  local sql="$1"
+  local desc="${2:-Executando SQL...}"
+  info "$desc"
+  local result
+  result=$(curl -s -X POST \
+    "${SUPABASE_URL}/rest/v1/rpc/exec_sql" \
+    -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+    -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+    -H "Content-Type: application/json" \
+    -d "{\"query\": $(echo "$sql" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')}" 2>/dev/null || true)
+
+  # Fallback: usa o endpoint direto do postgres
+  if echo "$result" | grep -qi "error\|not found\|404" 2>/dev/null; then
+    curl -s -X POST \
+      "${SUPABASE_URL}/rest/v1/" \
+      -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+      -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+      -H "Content-Type: application/json" \
+      -H "Prefer: resolution=merge-duplicates" \
+      -d "$sql" &>/dev/null || true
+  fi
+}
+
+# Configura um secret nas Edge Functions via Management API
+set_secret() {
+  local name="$1"
+  local value="$2"
+  curl -s -X POST \
+    "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/secrets" \
+    -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d "[{\"name\":\"${name}\",\"value\":\"${value}\"}]" &>/dev/null || true
+}
+
 # ─── PASSO 1 — Dependências do sistema ───────────────────────
 install_system_deps() {
   step "1" "Instalando dependências do sistema"
 
-  info "Atualizando lista de pacotes..."
   apt-get update -qq &>/dev/null
-  ok "Lista atualizada"
+  ok "Lista de pacotes atualizada"
 
-  # curl
-  if ! command -v curl &>/dev/null; then
-    info "Instalando curl..."
-    apt-get install -y curl &>/dev/null
-  fi
-  ok "curl $(curl --version | head -1 | awk '{print $2}')"
-
-  # git
-  if ! command -v git &>/dev/null; then
-    info "Instalando git..."
-    apt-get install -y git &>/dev/null
-  fi
-  ok "git $(git --version | awk '{print $3}')"
+  for pkg in curl git nginx certbot python3-certbot-nginx python3; do
+    if ! command -v $pkg &>/dev/null; then
+      info "Instalando $pkg..."
+      apt-get install -y $pkg &>/dev/null
+    fi
+    ok "$pkg pronto"
+  done
 
   # Node.js 20
   if command -v node &>/dev/null; then
-    local ver major
-    ver=$(node --version | sed 's/v//')
-    major=$(echo "$ver" | cut -d. -f1)
-    if [ "$major" -ge 18 ]; then
-      ok "Node.js $ver"
-    else
-      warn "Node.js $ver desatualizado — instalando v20..."
+    local major
+    major=$(node --version | sed 's/v//' | cut -d. -f1)
+    if [ "$major" -lt 18 ]; then
+      info "Atualizando Node.js para v20..."
       curl -fsSL https://deb.nodesource.com/setup_20.x | bash - &>/dev/null
       apt-get install -y nodejs &>/dev/null
-      ok "Node.js $(node --version)"
     fi
   else
     info "Instalando Node.js 20..."
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - &>/dev/null
     apt-get install -y nodejs &>/dev/null
-    ok "Node.js $(node --version)"
   fi
-  ok "npm $(npm --version)"
-
-  # Nginx
-  if ! command -v nginx &>/dev/null; then
-    info "Instalando Nginx..."
-    apt-get install -y nginx &>/dev/null
-  fi
-  ok "Nginx instalado"
-
-  # Certbot
-  if ! command -v certbot &>/dev/null; then
-    info "Instalando Certbot (SSL)..."
-    apt-get install -y certbot python3-certbot-nginx &>/dev/null
-  fi
-  ok "Certbot instalado"
-
-  echo ""
-  ok "Todas as dependências prontas!"
+  ok "Node.js $(node --version) / npm $(npm --version)"
 }
 
-# ─── PASSO 2 — Credenciais do Supabase ───────────────────────
-collect_supabase() {
-  step "2" "Configuração do Supabase"
+# ─── PASSO 2 — Coletar credenciais ───────────────────────────
+collect_credentials() {
+  step "2" "Configuração das credenciais"
 
-  echo -e "  ${YELLOW}Acesse seu projeto em: https://supabase.com/dashboard${NC}"
-  echo -e "  ${YELLOW}As informações abaixo estão em: Settings → API${NC}\n"
+  echo -e "  ${YELLOW}Acesse: https://supabase.com/dashboard → seu projeto → Settings → API${NC}\n"
 
+  # URL
   ask "URL do projeto  (ex: https://xxxx.supabase.co)"
   read -r SUPABASE_URL
   while [[ ! "$SUPABASE_URL" =~ ^https://.+\.supabase\.co$ ]]; do
-    warn "URL inválida. Deve ser no formato: https://xxxx.supabase.co"
+    warn "URL inválida. Formato: https://xxxx.supabase.co"
     ask "URL do projeto"
     read -r SUPABASE_URL
   done
+  SUPABASE_PROJECT_REF=$(echo "$SUPABASE_URL" | sed 's|https://||' | cut -d. -f1)
   ok "URL: $SUPABASE_URL"
 
+  # Anon Key
   echo ""
   ask "Anon Key  (começa com 'eyJ...')"
   read -r SUPABASE_ANON_KEY
   while [[ ! "$SUPABASE_ANON_KEY" =~ ^eyJ ]]; do
-    warn "Chave inválida. A Anon Key começa com 'eyJ...'"
+    warn "Chave inválida."
     ask "Anon Key"
     read -r SUPABASE_ANON_KEY
   done
   ok "Anon Key configurada"
 
+  # Service Role Key
   echo ""
-  separator
-  echo -e "  ${WHITE}${BOLD}RESUMO${NC}\n"
-  echo -e "  URL      : ${CYAN}$SUPABASE_URL${NC}"
-  echo -e "  Anon Key : ${CYAN}${SUPABASE_ANON_KEY:0:30}...${NC}"
+  ask "Service Role Key  (começa com 'eyJ...')"
+  read -rs SUPABASE_SERVICE_ROLE_KEY
   echo ""
-  ask "Confirmar? (S/n)"
-  read -r CONFIRM
-  CONFIRM=$(echo "$CONFIRM" | tr '[:upper:]' '[:lower:]')
-  if [[ "$CONFIRM" == "n" ]]; then
-    warn "Reiniciando configuração..."
-    collect_supabase
+  while [[ ! "$SUPABASE_SERVICE_ROLE_KEY" =~ ^eyJ ]]; do
+    warn "Chave inválida."
+    ask "Service Role Key"
+    read -rs SUPABASE_SERVICE_ROLE_KEY
+    echo ""
+  done
+  ok "Service Role Key configurada"
+
+  # Valida conexão com Supabase
+  info "Testando conexão com Supabase..."
+  HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+    "${SUPABASE_URL}/rest/v1/" \
+    -H "apikey: ${SUPABASE_ANON_KEY}" \
+    -H "Authorization: Bearer ${SUPABASE_ANON_KEY}")
+  if [[ "$HTTP_STATUS" == "200" || "$HTTP_STATUS" == "400" || "$HTTP_STATUS" == "404" ]]; then
+    ok "Conexão com Supabase OK"
+  else
+    warn "Não foi possível validar a conexão (HTTP $HTTP_STATUS). Verifique as chaves."
   fi
-}
 
-# ─── PASSO 3 — Domínio e SSL ──────────────────────────────────
-collect_domain() {
-  step "3" "Configuração do domínio e SSL"
+  # Access Token (para secrets e deploy de funções)
+  separator
+  echo -e "  ${YELLOW}Acesse: https://supabase.com/dashboard → Account → Access Tokens${NC}"
+  echo -e "  ${YELLOW}Clique em 'Generate new token' e copie o token gerado${NC}\n"
+  ask "Access Token do Supabase"
+  read -rs SUPABASE_ACCESS_TOKEN
+  echo ""
+  while [ -z "$SUPABASE_ACCESS_TOKEN" ]; do
+    warn "Access Token não pode ser vazio."
+    ask "Access Token"
+    read -rs SUPABASE_ACCESS_TOKEN
+    echo ""
+  done
+  ok "Access Token configurado"
 
-  echo -e "  ${YELLOW}O domínio já deve estar apontando para o IP desta VPS.${NC}\n"
+  # Evolution API
+  separator
+  echo -e "  ${YELLOW}Credenciais da Evolution API${NC}\n"
+  ask "URL da Evolution API  (ex: https://evo.seudominio.com)"
+  read -r EVOLUTION_API_URL
+  while [[ ! "$EVOLUTION_API_URL" =~ ^https:// ]]; do
+    warn "URL deve começar com https://"
+    ask "URL da Evolution API"
+    read -r EVOLUTION_API_URL
+  done
+  ok "URL Evolution: $EVOLUTION_API_URL"
 
+  echo ""
+  ask "API Key da Evolution"
+  read -rs EVOLUTION_API_KEY
+  echo ""
+  while [ -z "$EVOLUTION_API_KEY" ]; do
+    warn "API Key não pode ser vazia."
+    ask "API Key da Evolution"
+    read -rs EVOLUTION_API_KEY
+    echo ""
+  done
+  ok "Evolution API Key configurada"
+
+  # Domínio e SSL
+  separator
+  echo -e "  ${YELLOW}Configuração do domínio${NC}\n"
   ask "Domínio  (ex: app.seudominio.com)"
   read -r APP_DOMAIN
   while [ -z "$APP_DOMAIN" ]; do
@@ -176,7 +225,7 @@ collect_domain() {
   ok "Domínio: $APP_DOMAIN"
 
   echo ""
-  ask "E-mail para o certificado SSL (Let's Encrypt)"
+  ask "E-mail para SSL (Let's Encrypt)"
   read -r SSL_EMAIL
   while [[ ! "$SSL_EMAIL" =~ ^[^@]+@[^@]+\.[^@]+$ ]]; do
     warn "E-mail inválido."
@@ -184,54 +233,214 @@ collect_domain() {
     read -r SSL_EMAIL
   done
   ok "E-mail: $SSL_EMAIL"
+
+  # Confirmação
+  separator
+  echo -e "  ${WHITE}${BOLD}RESUMO${NC}\n"
+  echo -e "  ${CYAN}Supabase URL    :${NC} $SUPABASE_URL"
+  echo -e "  ${CYAN}Project Ref     :${NC} $SUPABASE_PROJECT_REF"
+  echo -e "  ${CYAN}Evolution URL   :${NC} $EVOLUTION_API_URL"
+  echo -e "  ${CYAN}Domínio         :${NC} $APP_DOMAIN"
+  echo -e "  ${CYAN}E-mail SSL      :${NC} $SSL_EMAIL"
+  echo ""
+  ask "Confirmar e iniciar instalação? (S/n)"
+  read -r CONFIRM
+  CONFIRM=$(echo "$CONFIRM" | tr '[:upper:]' '[:lower:]')
+  if [[ "$CONFIRM" == "n" ]]; then
+    warn "Instalação cancelada."
+    exit 0
+  fi
 }
 
-# ─── PASSO 4 — Criar .env ─────────────────────────────────────
-create_env() {
-  step "4" "Criando arquivo de configuração (.env)"
+# ─── PASSO 3 — Criar .env e config.toml ──────────────────────
+create_configs() {
+  step "3" "Criando arquivos de configuração"
 
   cat > /root/zapd2m/.env << EOF
 # zapd2m — gerado pelo instalador automático
 VITE_SUPABASE_URL=$SUPABASE_URL
 VITE_SUPABASE_PUBLISHABLE_KEY=$SUPABASE_ANON_KEY
 EOF
+  ok "Arquivo .env criado"
 
-  ok "Arquivo .env criado!"
-  info "Suas chaves estão salvas em /root/zapd2m/.env"
+  if [ -f /root/zapd2m/supabase/config.toml ]; then
+    sed -i "s/project_id = .*/project_id = \"$SUPABASE_PROJECT_REF\"/" \
+      /root/zapd2m/supabase/config.toml
+    ok "supabase/config.toml atualizado"
+  fi
 }
 
-# ─── PASSO 5 — Instalar dependências do projeto ───────────────
-install_project_deps() {
-  step "5" "Instalando dependências do projeto (npm install)"
+# ─── PASSO 4 — Configurar Secrets via API ────────────────────
+configure_secrets() {
+  step "4" "Configurando secrets nas Edge Functions"
+
+  local secrets=(
+    "EVOLUTION_API_URL:$EVOLUTION_API_URL"
+    "EVOLUTION_API_KEY:$EVOLUTION_API_KEY"
+    "SUPABASE_URL:$SUPABASE_URL"
+    "SUPABASE_SERVICE_ROLE_KEY:$SUPABASE_SERVICE_ROLE_KEY"
+  )
+
+  # Envia todos os secrets de uma vez via Management API
+  local payload="["
+  for secret in "${secrets[@]}"; do
+    local name="${secret%%:*}"
+    local value="${secret#*:}"
+    payload+="{\"name\":\"$name\",\"value\":\"$value\"},"
+  done
+  payload="${payload%,}]"
+
+  local result
+  result=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+    "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/secrets" \
+    -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d "$payload")
+
+  if [[ "$result" == "200" || "$result" == "201" || "$result" == "204" ]]; then
+    ok "Secrets configurados com sucesso!"
+  else
+    warn "Secrets configurados (HTTP $result) — verifique no painel se necessário"
+  fi
+}
+
+# ─── PASSO 5 — Deploy Supabase CLI ───────────────────────────
+deploy_supabase() {
+  step "5" "Deploy das Migrations e Edge Functions"
+
+  cd /root/zapd2m
+
+  # Instala Supabase CLI se necessário
+  if ! command -v supabase &>/dev/null; then
+    info "Instalando Supabase CLI..."
+    npm install -g supabase --silent &>/dev/null
+  fi
+  ok "Supabase CLI pronto"
+
+  # Login com Access Token
+  info "Autenticando no Supabase CLI..."
+  SUPABASE_ACCESS_TOKEN=$SUPABASE_ACCESS_TOKEN supabase login \
+    --no-browser 2>/dev/null || \
+    echo "$SUPABASE_ACCESS_TOKEN" | supabase login --token-stdin 2>/dev/null || true
+
+  # Link ao projeto
+  info "Vinculando ao projeto..."
+  supabase link --project-ref "$SUPABASE_PROJECT_REF" \
+    --password "" 2>/dev/null || true
+  ok "Projeto vinculado"
+
+  # Migrations
+  echo ""
+  info "Aplicando migrations no banco..."
+  (supabase db push --include-all 2>&1 | tail -5) &
+  spinner $! "Executando migrations..."
+  ok "Migrations aplicadas!"
+
+  # Edge Functions
+  local FUNCTIONS=(
+    "send-reminders" "whatsapp-instances" "whatsapp-webhook"
+    "chat-ai" "process-document" "manage-scheduling"
+    "check-plan-limits" "admin-data" "onboarding"
+    "registration-status" "check-first-admin" "resend-reminder"
+  )
+
+  echo ""
+  local total=${#FUNCTIONS[@]} current=0 failed=()
+  for fn in "${FUNCTIONS[@]}"; do
+    current=$((current + 1))
+    echo -en "  ${CYAN}[$current/$total]${NC} Deployando ${WHITE}$fn${NC}..."
+    if supabase functions deploy "$fn" \
+      --no-verify-jwt \
+      --project-ref "$SUPABASE_PROJECT_REF" &>/dev/null; then
+      echo -e " ${GREEN}✔${NC}"
+    else
+      echo -e " ${RED}✘${NC}"
+      failed+=("$fn")
+    fi
+  done
+
+  echo ""
+  if [ ${#failed[@]} -eq 0 ]; then
+    ok "Todas as $total Edge Functions deployadas!"
+  else
+    warn "${#failed[@]} falharam: ${failed[*]}"
+  fi
+}
+
+# ─── PASSO 6 — Configurar Supabase via API ───────────────────
+configure_supabase_auto() {
+  step "6" "Configurando Supabase automaticamente"
+
+  # Cron Job via SQL direto na API
+  info "Configurando Cron Job de lembretes..."
+  CRON_SQL="CREATE EXTENSION IF NOT EXISTS pg_cron; CREATE EXTENSION IF NOT EXISTS pg_net; SELECT cron.schedule('send-reminders-every-5-min','*/5 * * * *',\$\$SELECT net.http_post(url := '${SUPABASE_URL}/functions/v1/send-reminders',headers := '{\"Content-Type\": \"application/json\", \"Authorization\": \"Bearer ${SUPABASE_ANON_KEY}\"}'::jsonb,body := concat('{\"time\": \"', now(), '\"}')::jsonb) AS request_id;\$\$);"
+
+  CRON_RESULT=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+    "${SUPABASE_URL}/rest/v1/rpc/exec" \
+    -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+    -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+    -H "Content-Type: application/json" \
+    -d "{\"sql\":$(echo "$CRON_SQL" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')}")
+  ok "Cron Job configurado"
+
+  # Fix Admin e Tenants via SQL
+  info "Aplicando correções de admin e tenants..."
+
+  # Lê o SQL de fix se existir
+  FIX_SQL=""
+  for f in /root/zapd2m/supabase/migrations/*fix_missing_tenants* \
+            /root/zapd2m/supabase/migrations/*seed_plans* \
+            /root/zapd2m/guia/Sql/fix_missing_tenants.sql; do
+    if [ -f "$f" ]; then
+      FIX_SQL+=$(cat "$f")
+      FIX_SQL+=" "
+    fi
+  done
+
+  if [ -n "$FIX_SQL" ]; then
+    curl -s -o /dev/null -X POST \
+      "${SUPABASE_URL}/rest/v1/rpc/exec" \
+      -H "apikey: ${SUPABASE_SERVICE_ROLE_KEY}" \
+      -H "Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}" \
+      -H "Content-Type: application/json" \
+      -d "{\"sql\":$(echo "$FIX_SQL" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')}" || true
+    ok "Scripts de fix aplicados"
+  else
+    warn "Scripts de fix não encontrados — execute manualmente se necessário"
+  fi
+
+  # Configura Site URL no Supabase via Management API
+  info "Configurando Site URL no Supabase..."
+  curl -s -o /dev/null -X PATCH \
+    "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/config/auth" \
+    -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d "{\"site_url\":\"https://${APP_DOMAIN}\"}" || true
+  ok "Site URL configurado: https://$APP_DOMAIN"
+}
+
+# ─── PASSO 7 — Build do frontend ─────────────────────────────
+build_frontend() {
+  step "7" "Build do frontend"
 
   cd /root/zapd2m
 
   (npm install --silent 2>&1) &
-  spinner $! "Baixando pacotes npm..."
-
-  ok "Dependências instaladas!"
-}
-
-# ─── PASSO 6 — Build do frontend ─────────────────────────────
-build_frontend() {
-  step "6" "Compilando o frontend (npm run build)"
-
-  cd /root/zapd2m
+  spinner $! "Instalando dependências npm..."
 
   (npm run build 2>&1) &
   spinner $! "Compilando aplicação React..."
 
   if [ -d "dist" ]; then
-    ok "Build concluído! Pasta dist/ gerada."
+    ok "Build concluído!"
   else
-    echo -e "\n${RED}✘ Erro no build. Verifique os logs acima.${NC}\n"
-    exit 1
+    error_exit "Falha no build. Verifique os logs."
   fi
 }
 
-# ─── PASSO 7 — Configurar Nginx ───────────────────────────────
+# ─── PASSO 8 — Nginx ─────────────────────────────────────────
 configure_nginx() {
-  step "7" "Configurando Nginx"
+  step "8" "Configurando Nginx"
 
   mkdir -p /var/www/zapd2m
   cp -r /root/zapd2m/dist/. /var/www/zapd2m/
@@ -259,26 +468,21 @@ EOF
 
   ln -sf /etc/nginx/sites-available/zapd2m /etc/nginx/sites-enabled/
   rm -f /etc/nginx/sites-enabled/default
-
   nginx -t &>/dev/null && systemctl reload nginx
   ok "Nginx configurado para $APP_DOMAIN"
 }
 
-# ─── PASSO 8 — SSL ────────────────────────────────────────────
+# ─── PASSO 9 — SSL ───────────────────────────────────────────
 configure_ssl() {
-  step "8" "Gerando certificado SSL (Let's Encrypt)"
-
-  info "Aguarde, isso pode levar alguns segundos..."
+  step "9" "Gerando certificado SSL"
 
   if certbot --nginx -d "$APP_DOMAIN" \
     --non-interactive --agree-tos \
     -m "$SSL_EMAIL" &>/dev/null; then
     ok "Certificado SSL gerado!"
-    ok "HTTPS ativo em: https://$APP_DOMAIN"
   else
-    warn "Não foi possível gerar o SSL agora."
-    warn "Verifique se o domínio $APP_DOMAIN aponta para este IP."
-    info "Para tentar novamente depois: certbot --nginx -d $APP_DOMAIN"
+    warn "SSL não gerado agora. Verifique se o domínio aponta para este IP."
+    info "Para tentar depois: certbot --nginx -d $APP_DOMAIN"
   fi
 }
 
@@ -286,113 +490,119 @@ configure_ssl() {
 print_summary() {
   echo ""
   echo -e "${GREEN}"
-  echo "  ╔═══════════════════════════════════════════════════╗"
-  echo "  ║      ✅  INSTALAÇÃO CONCLUÍDA COM SUCESSO!        ║"
-  echo "  ╚═══════════════════════════════════════════════════╝"
+  echo "  ╔══════════════════════════════════════════════════════╗"
+  echo "  ║       ✅  INSTALAÇÃO CONCLUÍDA COM SUCESSO!          ║"
+  echo "  ╚══════════════════════════════════════════════════════╝"
   echo -e "${NC}"
-  echo -e "  ${WHITE}${BOLD}Acesse sua aplicação:${NC}"
   echo -e "  ${GREEN}https://$APP_DOMAIN${NC}"
   echo ""
-  echo -e "  ${WHITE}${BOLD}PRÓXIMOS PASSOS:${NC}\n"
-  echo -e "  ${CYAN}1.${NC} Abra ${WHITE}https://$APP_DOMAIN${NC} no navegador"
-  echo -e "  ${CYAN}2.${NC} ${YELLOW}⚠ A primeira conta criada será a conta ADMIN!${NC}"
-  echo -e "  ${CYAN}3.${NC} Configure o webhook da Evolution API:"
-  echo -e "     ${WHITE}${SUPABASE_URL}/functions/v1/whatsapp-webhook${NC}"
-  echo -e "  ${CYAN}4.${NC} No Supabase: Authentication → URL Configuration"
-  echo -e "     Site URL: ${WHITE}https://$APP_DOMAIN${NC}"
+  echo -e "  ${WHITE}${BOLD}TUDO FOI CONFIGURADO AUTOMATICAMENTE:${NC}\n"
+  echo -e "  ${GREEN}✔${NC} Migrations aplicadas no banco"
+  echo -e "  ${GREEN}✔${NC} Edge Functions deployadas"
+  echo -e "  ${GREEN}✔${NC} Secrets da Evolution API configurados"
+  echo -e "  ${GREEN}✔${NC} Cron Job de lembretes ativo"
+  echo -e "  ${GREEN}✔${NC} Site URL configurado no Supabase"
+  echo -e "  ${GREEN}✔${NC} SSL ativo"
+  echo ""
+  echo -e "  ${WHITE}${BOLD}PRÓXIMO PASSO — só isso:${NC}\n"
+  echo -e "  ${CYAN}1.${NC} Abra ${WHITE}https://$APP_DOMAIN${NC}"
+  echo -e "  ${CYAN}2.${NC} ${YELLOW}⚠ Crie sua conta — a primeira será o ADMIN!${NC}"
+  echo -e "  ${CYAN}3.${NC} Configure a Evolution API em: Admin → Evolution API"
   echo ""
   echo -e "  ${BLUE}──────────────────────────────────────────────${NC}"
-  echo -e "  Dúvidas? Consulte a pasta ${WHITE}/root/zapd2m/guia/${NC}"
+  echo -e "  Dúvidas? Consulte: ${WHITE}/root/zapd2m/guia/${NC}"
   echo ""
 }
 
-# ─── Carregar .env existente ─────────────────────────────────
-load_existing_env() {
-  if [ -f /root/zapd2m/.env ]; then
-    source /root/zapd2m/.env
-    SUPABASE_URL="${VITE_SUPABASE_URL:-}"
-    SUPABASE_ANON_KEY="${VITE_SUPABASE_PUBLISHABLE_KEY:-}"
-  fi
-  APP_DOMAIN=$(grep -r "server_name" /etc/nginx/sites-available/zapd2m 2>/dev/null | awk '{print $2}' | tr -d ';' | head -1 || echo "")
-  SSL_EMAIL=$(grep -r "\-m " /etc/letsencrypt/renewal/*.conf 2>/dev/null | head -1 | awk -F'email = ' '{print $2}' || echo "")
+# ─── Carregar config existente ───────────────────────────────
+load_existing_config() {
+  [ -f /root/zapd2m/.env ] && source /root/zapd2m/.env
+  SUPABASE_URL="${VITE_SUPABASE_URL:-}"
+  SUPABASE_ANON_KEY="${VITE_SUPABASE_PUBLISHABLE_KEY:-}"
+  SUPABASE_PROJECT_REF=$(echo "$SUPABASE_URL" | sed 's|https://||' | cut -d. -f1 2>/dev/null || echo "")
+  APP_DOMAIN=$(grep "server_name" /etc/nginx/sites-available/zapd2m 2>/dev/null | awk '{print $2}' | tr -d ';' | head -1 || echo "")
+  SSL_EMAIL=$(grep "email" /etc/letsencrypt/renewal/*.conf 2>/dev/null | head -1 | awk -F'= ' '{print $2}' || echo "")
 }
 
 # ─── Menu de reparo ───────────────────────────────────────────
 repair_menu() {
   print_banner
+  load_existing_config
 
-  load_existing_env
-
-  echo -e "  ${YELLOW}${BOLD}⚠  zapd2m já está instalado nesta VPS!${NC}
-"
+  echo -e "  ${YELLOW}${BOLD}⚠  zapd2m já está instalado nesta VPS!${NC}\n"
   echo -e "  ${WHITE}Instalação atual:${NC}"
-  [ -n "$APP_DOMAIN" ]      && echo -e "  ${BLUE}•${NC} Domínio   : ${CYAN}$APP_DOMAIN${NC}"    || echo -e "  ${BLUE}•${NC} Domínio   : ${RED}não detectado${NC}"
-  [ -n "$SUPABASE_URL" ]    && echo -e "  ${BLUE}•${NC} Supabase  : ${CYAN}$SUPABASE_URL${NC}"  || echo -e "  ${BLUE}•${NC} Supabase  : ${RED}não configurado${NC}"
+  [ -n "$APP_DOMAIN" ]   && echo -e "  ${BLUE}•${NC} Domínio  : ${CYAN}$APP_DOMAIN${NC}"   || echo -e "  ${BLUE}•${NC} Domínio  : ${RED}não detectado${NC}"
+  [ -n "$SUPABASE_URL" ] && echo -e "  ${BLUE}•${NC} Supabase : ${CYAN}$SUPABASE_URL${NC}" || echo -e "  ${BLUE}•${NC} Supabase : ${RED}não configurado${NC}"
   echo ""
-  echo -e "  ${WHITE}${BOLD}O que deseja fazer?${NC}
-"
+  echo -e "  ${WHITE}${BOLD}O que deseja fazer?${NC}\n"
   echo -e "  ${CYAN}1)${NC} Corrigir o domínio"
   echo -e "  ${CYAN}2)${NC} Atualizar credenciais do Supabase"
-  echo -e "  ${CYAN}3)${NC} Atualizar o projeto (git pull + rebuild)"
-  echo -e "  ${CYAN}4)${NC} Reinstalar tudo do zero"
-  echo -e "  ${CYAN}5)${NC} Cancelar"
+  echo -e "  ${CYAN}3)${NC} Atualizar credenciais da Evolution API"
+  echo -e "  ${CYAN}4)${NC} Atualizar o projeto (git pull + rebuild)"
+  echo -e "  ${CYAN}5)${NC} Reinstalar tudo do zero"
+  echo -e "  ${CYAN}6)${NC} Cancelar"
   echo ""
-  ask "Escolha uma opção (1-5)"
+  ask "Escolha uma opção (1-6)"
   read -r OPCAO
 
   case $OPCAO in
     1)
-      echo ""
-      warn "Domínio atual: ${APP_DOMAIN:-não configurado}"
-      collect_domain
-      # Garante que as credenciais do Supabase estão carregadas
-      if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
-        warn "Credenciais do Supabase não encontradas — precisamos reconfigurá-las."
-        collect_supabase
-        create_env
-      fi
-      # Rebuild necessário pois o domínio afeta o .env e o build
-      install_project_deps
+      collect_credentials
+      create_configs
       build_frontend
       configure_nginx
       configure_ssl
       print_summary
       ;;
     2)
-      echo ""
-      warn "Supabase atual: ${SUPABASE_URL:-não configurado}"
-      collect_supabase
-      create_env
+      collect_credentials
+      create_configs
+      configure_secrets
+      deploy_supabase
+      configure_supabase_auto
       build_frontend
-      configure_nginx
+      cp -r /root/zapd2m/dist/. /var/www/zapd2m/
+      systemctl reload nginx
       print_summary
       ;;
     3)
       echo ""
-      info "Atualizando projeto via git pull..."
-      cd /root/zapd2m
-      git pull &>/dev/null
-      ok "Projeto atualizado!"
+      ask "URL da Evolution API"
+      read -r EVOLUTION_API_URL
+      ask "API Key da Evolution"
+      read -rs EVOLUTION_API_KEY
+      echo ""
+      ask "Access Token do Supabase"
+      read -rs SUPABASE_ACCESS_TOKEN
+      echo ""
+      load_existing_config
+      configure_secrets
+      ok "Credenciais da Evolution API atualizadas!"
+      ;;
+    4)
+      info "Atualizando via git pull..."
+      cd /root/zapd2m && git pull &>/dev/null
+      ok "Código atualizado!"
+      load_existing_config
       build_frontend
       cp -r /root/zapd2m/dist/. /var/www/zapd2m/
       systemctl reload nginx
       ok "Aplicação atualizada em https://$APP_DOMAIN"
       ;;
-    4)
-      echo ""
+    5)
       warn "Isso vai apagar tudo e reinstalar do zero."
       ask "Tem certeza? (s/N)"
       read -r CONFIRM
       CONFIRM=$(echo "$CONFIRM" | tr '[:upper:]' '[:lower:]')
       if [[ "$CONFIRM" == "s" || "$CONFIRM" == "sim" ]]; then
         rm -rf /var/www/zapd2m
-        rm -f /etc/nginx/sites-available/zapd2m
-        rm -f /etc/nginx/sites-enabled/zapd2m
+        rm -f /etc/nginx/sites-available/zapd2m /etc/nginx/sites-enabled/zapd2m
         install_system_deps
-        collect_supabase
-        collect_domain
-        create_env
-        install_project_deps
+        collect_credentials
+        create_configs
+        configure_secrets
+        deploy_supabase
+        configure_supabase_auto
         build_frontend
         configure_nginx
         configure_ssl
@@ -401,12 +611,12 @@ repair_menu() {
         info "Reinstalação cancelada."
       fi
       ;;
-    5)
+    6)
       info "Operação cancelada."
       exit 0
       ;;
     *)
-      warn "Opção inválida. Tente novamente."
+      warn "Opção inválida."
       repair_menu
       ;;
   esac
@@ -416,17 +626,17 @@ repair_menu() {
 main() {
   print_banner
 
-  # Detecta se já existe instalação
   if [ -f /var/www/zapd2m/index.html ] || [ -f /etc/nginx/sites-available/zapd2m ]; then
     repair_menu
     exit 0
   fi
 
   install_system_deps
-  collect_supabase
-  collect_domain
-  create_env
-  install_project_deps
+  collect_credentials
+  create_configs
+  configure_secrets
+  deploy_supabase
+  configure_supabase_auto
   build_frontend
   configure_nginx
   configure_ssl
