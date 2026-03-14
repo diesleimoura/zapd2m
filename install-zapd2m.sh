@@ -350,12 +350,40 @@ deploy_supabase() {
 
   cd /root/zapd2m
 
-  # Instala Supabase CLI via binário oficial
+  # ── Instala psql para rodar migrations direto no banco ──────
+  if ! command -v psql &>/dev/null; then
+    info "Instalando postgresql-client..."
+    apt-get install -y postgresql-client &>/dev/null
+  fi
+  ok "psql pronto"
+
+  # ── Monta a connection string do Supabase ───────────────────
+  # Formato: postgresql://postgres:[senha]@db.[ref].supabase.co:5432/postgres
+  local DB_HOST="db.${SUPABASE_PROJECT_REF}.supabase.co"
+  local DB_URL="postgresql://postgres:${SUPABASE_DB_PASSWORD}@${DB_HOST}:5432/postgres"
+
+  # ── Aplica cada migration em ordem ──────────────────────────
+  echo ""
+  info "Aplicando migrations no banco de dados..."
+  local mig_ok=0 mig_fail=0
+  for f in $(ls /root/zapd2m/supabase/migrations/*.sql 2>/dev/null | sort); do
+    local fname=$(basename "$f")
+    echo -en "  ${CYAN}▶${NC} $fname..."
+    if PGPASSWORD="$SUPABASE_DB_PASSWORD" psql "$DB_URL" -f "$f" &>/dev/null; then
+      echo -e " ${GREEN}✔${NC}"
+      mig_ok=$((mig_ok + 1))
+    else
+      echo -e " ${YELLOW}~${NC} (já aplicada ou ignorada)"
+      mig_fail=$((mig_fail + 1))
+    fi
+  done
+  ok "Migrations: $mig_ok aplicadas, $mig_fail ignoradas"
+
+  # ── Instala Supabase CLI para deploy das Edge Functions ─────
   if ! command -v supabase &>/dev/null; then
-    info "Instalando Supabase CLI (binário oficial)..."
+    info "Instalando Supabase CLI..."
     local SB_VER="2.0.5"
-    curl -fsSL "https://github.com/supabase/cli/releases/download/v${SB_VER}/supabase_linux_amd64.tar.gz" \
-      -o /tmp/supabase.tar.gz 2>/dev/null
+    curl -fsSL "https://github.com/supabase/cli/releases/download/v${SB_VER}/supabase_linux_amd64.tar.gz"       -o /tmp/supabase.tar.gz 2>/dev/null
     tar -xzf /tmp/supabase.tar.gz -C /tmp 2>/dev/null
     local BIN
     BIN=$(find /tmp -name "supabase" -type f 2>/dev/null | head -1)
@@ -367,30 +395,18 @@ deploy_supabase() {
   fi
 
   if ! command -v supabase &>/dev/null; then
-    warn "Supabase CLI não pôde ser instalado — pulando deploy de funções"
-    warn "Execute manualmente depois: npx supabase functions deploy"
+    warn "Supabase CLI não instalado — Edge Functions não deployadas"
     return
   fi
   ok "Supabase CLI $(supabase --version 2>/dev/null | head -1)"
 
-  # Login com Access Token
-  info "Autenticando no Supabase CLI..."
+  # ── Login e link ────────────────────────────────────────────
   export SUPABASE_ACCESS_TOKEN="$SUPABASE_ACCESS_TOKEN"
   supabase login --no-browser 2>/dev/null || true
-
-  # Link ao projeto (com timeout para não travar)
-  info "Vinculando ao projeto..."
   timeout 30 supabase link     --project-ref "$SUPABASE_PROJECT_REF"     --password "$SUPABASE_DB_PASSWORD" 2>/dev/null || true
   ok "Projeto vinculado"
 
-  # Migrations (com timeout)
-  echo ""
-  info "Aplicando migrations no banco..."
-  (timeout 120 supabase db push --include-all 2>&1 | tail -5) &
-  spinner $! "Executando migrations..."
-  ok "Migrations aplicadas!"
-
-  # Edge Functions (deploy direto sem link, usando project-ref)
+  # ── Deploy das Edge Functions ───────────────────────────────
   local FUNCTIONS=(
     "send-reminders" "whatsapp-instances" "whatsapp-webhook"
     "chat-ai" "process-document" "manage-scheduling"
@@ -419,109 +435,85 @@ deploy_supabase() {
   fi
 }
 
+
 # ─── PASSO 6 — Configurar Supabase via API ───────────────────
 configure_supabase_auto() {
   step "6" "Configurando Supabase automaticamente"
 
-  # Função helper para executar SQL via API
-  run_supabase_sql() {
+  local DB_HOST="db.${SUPABASE_PROJECT_REF}.supabase.co"
+  local DB_URL="postgresql://postgres:${SUPABASE_DB_PASSWORD}@${DB_HOST}:5432/postgres"
+
+  # Função helper — executa SQL direto no banco via psql
+  run_sql() {
     local desc="$1"
     local sql="$2"
     info "$desc"
-    echo "$sql" | python3 -c "
-import sys, json, subprocess
-sql = sys.stdin.read()
-r = subprocess.run([
-  'curl','-s','-o','/dev/null','-w','%{http_code}',
-  '-X','POST',
-  '${SUPABASE_URL}/pg/query',
-  '-H','apikey: ${SUPABASE_SERVICE_ROLE_KEY}',
-  '-H','Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}',
-  '-H','Content-Type: application/json',
-  '-d', json.dumps({'sql': sql})
-], capture_output=True, text=True)
-" 2>/dev/null || true
+    PGPASSWORD="$SUPABASE_DB_PASSWORD" psql "$DB_URL" -c "$sql" &>/dev/null || true
   }
 
   # ── 1. Ativa cadastro ──────────────────────────────────────
-  run_supabase_sql "Ativando cadastro de novos usuários..."     "INSERT INTO system_settings (key, value) VALUES ('registration_open', 'true') ON CONFLICT (key) DO UPDATE SET value = 'true';"
+  run_sql "Ativando cadastro de novos usuários..." "
+    INSERT INTO system_settings (registration)
+    VALUES (true)
+    ON CONFLICT (id) DO UPDATE SET registration = true;"
   ok "Cadastro ativado"
 
   # ── 2. Garante plano Free ──────────────────────────────────
-  run_supabase_sql "Criando plano Free..." "
-DO \$\$
-DECLARE v_plan_id uuid;
-BEGIN
-  SELECT id INTO v_plan_id FROM plans WHERE name ILIKE '%free%' OR price = 0 LIMIT 1;
-  IF v_plan_id IS NULL THEN
-    INSERT INTO plans (name, price, max_instances, max_users, max_messages, is_active)
-    VALUES ('Free', 0, 1, 1, 100, true) RETURNING id INTO v_plan_id;
-  END IF;
-  UPDATE tenants SET plan_id = v_plan_id WHERE plan_id IS NULL;
-END; \$\$;"
+  run_sql "Criando plano Free..." "
+    DO \$\$
+    DECLARE v_plan_id uuid;
+    BEGIN
+      SELECT id INTO v_plan_id FROM plans WHERE name ILIKE '%free%' OR price = 0 LIMIT 1;
+      IF v_plan_id IS NULL THEN
+        INSERT INTO plans (name, price, max_instances, max_users, max_messages, is_active)
+        VALUES ('Free', 0, 1, 1, 100, true) RETURNING id INTO v_plan_id;
+      END IF;
+      UPDATE tenants SET plan_id = v_plan_id WHERE plan_id IS NULL;
+    END; \$\$;"
   ok "Plano Free garantido"
 
   # ── 3. Cria tenants para usuários sem tenant ───────────────
-  run_supabase_sql "Criando tenants para usuários sem tenant..." "
-INSERT INTO tenants (user_id, name, plan_id)
-SELECT au.id,
-  COALESCE(au.raw_user_meta_data->>'name', au.email),
-  (SELECT id FROM plans ORDER BY price ASC LIMIT 1)
-FROM auth.users au
-LEFT JOIN tenants t ON t.user_id = au.id
-WHERE t.id IS NULL
-ON CONFLICT DO NOTHING;"
+  run_sql "Criando tenants para usuários sem tenant..." "
+    INSERT INTO tenants (user_id, name, plan_id)
+    SELECT au.id,
+      COALESCE(au.raw_user_meta_data->>'name', au.email),
+      (SELECT id FROM plans ORDER BY price ASC LIMIT 1)
+    FROM auth.users au
+    LEFT JOIN tenants t ON t.user_id = au.id
+    WHERE t.id IS NULL
+    ON CONFLICT DO NOTHING;"
   ok "Tenants verificados"
 
   # ── 4. Garante admin para primeiro usuário ─────────────────
-  run_supabase_sql "Configurando primeiro usuário como admin..." "
-UPDATE profiles SET role = 'admin'
-WHERE user_id = (SELECT id FROM auth.users ORDER BY created_at ASC LIMIT 1)
-  AND (role IS NULL OR role != 'admin');"
+  run_sql "Configurando primeiro usuário como admin..." "
+    UPDATE profiles SET role = 'admin'
+    WHERE user_id = (SELECT id FROM auth.users ORDER BY created_at ASC LIMIT 1)
+      AND (role IS NULL OR role != 'admin');"
   ok "Admin configurado"
 
-  # ── 5. Aplica SQLs de fix do projeto ──────────────────────
-  local FIX_SQL=""
-  for f in /root/zapd2m/supabase/migrations/*fix_missing_tenants*             /root/zapd2m/supabase/migrations/*seed_plans*             /root/zapd2m/supabase/migrations/*fix_tenants*; do
-    [ -f "$f" ] && FIX_SQL+=$(cat "$f") && FIX_SQL+=" "
-  done
-  if [ -n "$FIX_SQL" ]; then
-    echo "$FIX_SQL" | python3 -c "
-import sys, json, subprocess
-sql = sys.stdin.read()
-subprocess.run([
-  'curl','-s','-o','/dev/null',
-  '-X','POST',
-  '${SUPABASE_URL}/pg/query',
-  '-H','apikey: ${SUPABASE_SERVICE_ROLE_KEY}',
-  '-H','Authorization: Bearer ${SUPABASE_SERVICE_ROLE_KEY}',
-  '-H','Content-Type: application/json',
-  '-d', json.dumps({'sql': sql})
-], capture_output=True)
-" 2>/dev/null || true
-    ok "Scripts de fix do projeto aplicados"
-  fi
-
-  # ── 6. Cron Job ───────────────────────────────────────────
-  run_supabase_sql "Configurando Cron Job de lembretes..." "
-CREATE EXTENSION IF NOT EXISTS pg_cron;
-CREATE EXTENSION IF NOT EXISTS pg_net;
-SELECT cron.schedule(
-  'send-reminders-every-5-min', '*/5 * * * *',
-  \$\$SELECT net.http_post(
-    url := '${SUPABASE_URL}/functions/v1/send-reminders',
-    headers := '{"Content-Type": "application/json", "Authorization": "Bearer ${SUPABASE_ANON_KEY}"}'::jsonb,
-    body := concat('{"time": "', now(), '"}')::jsonb
-  ) AS request_id;\$\$
-);"
+  # ── 5. Cron Job ───────────────────────────────────────────
+  run_sql "Configurando Cron Job de lembretes..." "
+    CREATE EXTENSION IF NOT EXISTS pg_cron;
+    CREATE EXTENSION IF NOT EXISTS pg_net;
+    SELECT cron.schedule(
+      'send-reminders-every-5-min', '*/5 * * * *',
+      \$cron\$SELECT net.http_post(
+        url := '${SUPABASE_URL}/functions/v1/send-reminders',
+        headers := '{"Content-Type": "application/json", "Authorization": "Bearer ${SUPABASE_ANON_KEY}"}'::jsonb,
+        body := concat('{"time": "', now(), '"}')::jsonb
+      ) AS request_id;\$cron\$
+    );"
   ok "Cron Job configurado"
 
-  # ── 7. Site URL ───────────────────────────────────────────
+  # ── 6. Site URL via Management API ────────────────────────
   info "Configurando Site URL no Supabase..."
-  curl -s -o /dev/null -X PATCH     "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/config/auth"     -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}"     -H "Content-Type: application/json"     -d "{"site_url":"https://${APP_DOMAIN}"}" || true
+  curl -s -o /dev/null -X PATCH \
+    "https://api.supabase.com/v1/projects/${SUPABASE_PROJECT_REF}/config/auth" \
+    -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
+    -H "Content-Type: application/json" \
+    -d "{\"site_url\":\"https://${APP_DOMAIN}\"}" || true
   ok "Site URL configurado: https://$APP_DOMAIN"
 }
-
 
 # ─── PASSO 7 — Build do frontend ─────────────────────────────
 build_frontend() {
