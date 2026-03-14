@@ -350,40 +350,47 @@ deploy_supabase() {
 
   cd /root/zapd2m
 
-  # ── Instala psql para rodar migrations direto no banco ──────
+  # ── Instala psql ────────────────────────────────────────────
   if ! command -v psql &>/dev/null; then
     info "Instalando postgresql-client..."
     apt-get install -y postgresql-client &>/dev/null
   fi
   ok "psql pronto"
 
-  # ── Monta a connection string do Supabase ───────────────────
-  # Formato: postgresql://postgres:[senha]@db.[ref].supabase.co:5432/postgres
+  # ── Codifica a senha para URL (trata caracteres especiais) ──
+  local DB_PASS_ENCODED
+  DB_PASS_ENCODED=$(python3 -c "
+import urllib.parse
+print(urllib.parse.quote('${SUPABASE_DB_PASSWORD}', safe=''))
+")
   local DB_HOST="db.${SUPABASE_PROJECT_REF}.supabase.co"
-  local DB_URL="postgresql://postgres:${SUPABASE_DB_PASSWORD}@${DB_HOST}:5432/postgres"
+  local DB_URL="postgresql://postgres:${DB_PASS_ENCODED}@${DB_HOST}:5432/postgres"
 
-  # ── Aplica cada migration em ordem ──────────────────────────
+  # ── Aplica todas as migrations em ordem ─────────────────────
   echo ""
   info "Aplicando migrations no banco de dados..."
-  local mig_ok=0 mig_fail=0
+  local mig_total=0 mig_ok=0
+
   for f in $(ls /root/zapd2m/supabase/migrations/*.sql 2>/dev/null | sort); do
+    mig_total=$((mig_total + 1))
     local fname=$(basename "$f")
     echo -en "  ${CYAN}▶${NC} $fname..."
-    if PGPASSWORD="$SUPABASE_DB_PASSWORD" psql "$DB_URL" -f "$f" &>/dev/null; then
+    if PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql "$DB_URL" -f "$f" &>/dev/null; then
       echo -e " ${GREEN}✔${NC}"
       mig_ok=$((mig_ok + 1))
     else
       echo -e " ${YELLOW}~${NC} (já aplicada ou ignorada)"
-      mig_fail=$((mig_fail + 1))
     fi
   done
-  ok "Migrations: $mig_ok aplicadas, $mig_fail ignoradas"
+
+  ok "Migrations: $mig_ok/$mig_total aplicadas"
 
   # ── Instala Supabase CLI para deploy das Edge Functions ─────
   if ! command -v supabase &>/dev/null; then
     info "Instalando Supabase CLI..."
     local SB_VER="2.0.5"
-    curl -fsSL "https://github.com/supabase/cli/releases/download/v${SB_VER}/supabase_linux_amd64.tar.gz"       -o /tmp/supabase.tar.gz 2>/dev/null
+    curl -fsSL "https://github.com/supabase/cli/releases/download/v${SB_VER}/supabase_linux_amd64.tar.gz" \
+      -o /tmp/supabase.tar.gz 2>/dev/null
     tar -xzf /tmp/supabase.tar.gz -C /tmp 2>/dev/null
     local BIN
     BIN=$(find /tmp -name "supabase" -type f 2>/dev/null | head -1)
@@ -401,9 +408,11 @@ deploy_supabase() {
   ok "Supabase CLI $(supabase --version 2>/dev/null | head -1)"
 
   # ── Login e link ────────────────────────────────────────────
-  export SUPABASE_ACCESS_TOKEN="$SUPABASE_ACCESS_TOKEN"
+  export SUPABASE_ACCESS_TOKEN="${SUPABASE_ACCESS_TOKEN}"
   supabase login --no-browser 2>/dev/null || true
-  timeout 30 supabase link     --project-ref "$SUPABASE_PROJECT_REF"     --password "$SUPABASE_DB_PASSWORD" 2>/dev/null || true
+  timeout 30 supabase link \
+    --project-ref "${SUPABASE_PROJECT_REF}" \
+    --password "${SUPABASE_DB_PASSWORD}" 2>/dev/null || true
   ok "Projeto vinculado"
 
   # ── Deploy das Edge Functions ───────────────────────────────
@@ -419,7 +428,9 @@ deploy_supabase() {
   for fn in "${FUNCTIONS[@]}"; do
     current=$((current + 1))
     echo -en "  ${CYAN}[$current/$total]${NC} Deployando ${WHITE}$fn${NC}..."
-    if timeout 60 supabase functions deploy "$fn"       --no-verify-jwt       --project-ref "$SUPABASE_PROJECT_REF" &>/dev/null; then
+    if timeout 60 supabase functions deploy "$fn" \
+      --no-verify-jwt \
+      --project-ref "${SUPABASE_PROJECT_REF}" &>/dev/null; then
       echo -e " ${GREEN}✔${NC}"
     else
       echo -e " ${RED}✘${NC}"
@@ -436,73 +447,79 @@ deploy_supabase() {
 }
 
 
+
 # ─── PASSO 6 — Configurar Supabase via API ───────────────────
 configure_supabase_auto() {
   step "6" "Configurando Supabase automaticamente"
 
+  # Codifica senha para URL
+  local DB_PASS_ENCODED
+  DB_PASS_ENCODED=$(python3 -c "
+import urllib.parse
+print(urllib.parse.quote('${SUPABASE_DB_PASSWORD}', safe=''))
+")
   local DB_HOST="db.${SUPABASE_PROJECT_REF}.supabase.co"
-  local DB_URL="postgresql://postgres:${SUPABASE_DB_PASSWORD}@${DB_HOST}:5432/postgres"
+  local DB_URL="postgresql://postgres:${DB_PASS_ENCODED}@${DB_HOST}:5432/postgres"
 
-  # Função helper — executa SQL direto no banco via psql
+  # Helper para executar SQL direto no banco
   run_sql() {
     local desc="$1"
     local sql="$2"
     info "$desc"
-    PGPASSWORD="$SUPABASE_DB_PASSWORD" psql "$DB_URL" -c "$sql" &>/dev/null || true
+    PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql "$DB_URL" -c "$sql" &>/dev/null || true
   }
 
   # ── 1. Ativa cadastro ──────────────────────────────────────
-  run_sql "Ativando cadastro de novos usuários..." "
-    INSERT INTO system_settings (registration)
-    VALUES (true)
-    ON CONFLICT (id) DO UPDATE SET registration = true;"
+  run_sql "Ativando cadastro de novos usuários..." \
+    "INSERT INTO system_settings (registration) VALUES (true) ON CONFLICT (id) DO UPDATE SET registration = true;"
   ok "Cadastro ativado"
 
   # ── 2. Garante plano Free ──────────────────────────────────
-  run_sql "Criando plano Free..." "
-    DO \$\$
-    DECLARE v_plan_id uuid;
-    BEGIN
-      SELECT id INTO v_plan_id FROM plans WHERE name ILIKE '%free%' OR price = 0 LIMIT 1;
-      IF v_plan_id IS NULL THEN
-        INSERT INTO plans (name, price, max_instances, max_users, max_messages, is_active)
-        VALUES ('Free', 0, 1, 1, 100, true) RETURNING id INTO v_plan_id;
-      END IF;
-      UPDATE tenants SET plan_id = v_plan_id WHERE plan_id IS NULL;
-    END; \$\$;"
+  PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql "$DB_URL" << 'SQLEOF' &>/dev/null || true
+DO $$
+DECLARE v_plan_id uuid;
+BEGIN
+  SELECT id INTO v_plan_id FROM plans WHERE name ILIKE '%free%' OR price = 0 LIMIT 1;
+  IF v_plan_id IS NULL THEN
+    INSERT INTO plans (name, price, max_instances, max_users, max_messages, is_active)
+    VALUES ('Free', 0, 1, 1, 100, true) RETURNING id INTO v_plan_id;
+  END IF;
+  UPDATE tenants SET plan_id = v_plan_id WHERE plan_id IS NULL;
+END; $$;
+SQLEOF
   ok "Plano Free garantido"
 
   # ── 3. Cria tenants para usuários sem tenant ───────────────
-  run_sql "Criando tenants para usuários sem tenant..." "
-    INSERT INTO tenants (user_id, name, plan_id)
-    SELECT au.id,
-      COALESCE(au.raw_user_meta_data->>'name', au.email),
-      (SELECT id FROM plans ORDER BY price ASC LIMIT 1)
-    FROM auth.users au
-    LEFT JOIN tenants t ON t.user_id = au.id
-    WHERE t.id IS NULL
-    ON CONFLICT DO NOTHING;"
+  run_sql "Criando tenants para usuários sem tenant..." \
+    "INSERT INTO tenants (user_id, name, plan_id)
+     SELECT au.id, COALESCE(au.raw_user_meta_data->>'name', au.email),
+       (SELECT id FROM plans ORDER BY price ASC LIMIT 1)
+     FROM auth.users au
+     LEFT JOIN tenants t ON t.user_id = au.id
+     WHERE t.id IS NULL
+     ON CONFLICT DO NOTHING;"
   ok "Tenants verificados"
 
   # ── 4. Garante admin para primeiro usuário ─────────────────
-  run_sql "Configurando primeiro usuário como admin..." "
-    UPDATE profiles SET role = 'admin'
-    WHERE user_id = (SELECT id FROM auth.users ORDER BY created_at ASC LIMIT 1)
-      AND (role IS NULL OR role != 'admin');"
+  run_sql "Configurando primeiro usuário como admin..." \
+    "UPDATE profiles SET role = 'admin'
+     WHERE user_id = (SELECT id FROM auth.users ORDER BY created_at ASC LIMIT 1)
+     AND (role IS NULL OR role != 'admin');"
   ok "Admin configurado"
 
   # ── 5. Cron Job ───────────────────────────────────────────
-  run_sql "Configurando Cron Job de lembretes..." "
-    CREATE EXTENSION IF NOT EXISTS pg_cron;
-    CREATE EXTENSION IF NOT EXISTS pg_net;
-    SELECT cron.schedule(
-      'send-reminders-every-5-min', '*/5 * * * *',
-      \$cron\$SELECT net.http_post(
-        url := '${SUPABASE_URL}/functions/v1/send-reminders',
-        headers := '{"Content-Type": "application/json", "Authorization": "Bearer ${SUPABASE_ANON_KEY}"}'::jsonb,
-        body := concat('{"time": "', now(), '"}')::jsonb
-      ) AS request_id;\$cron\$
-    );"
+  PGPASSWORD="${SUPABASE_DB_PASSWORD}" psql "$DB_URL" << SQLEOF &>/dev/null || true
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+CREATE EXTENSION IF NOT EXISTS pg_net;
+SELECT cron.schedule(
+  'send-reminders-every-5-min', '*/5 * * * *',
+  \$cron\$SELECT net.http_post(
+    url := '${SUPABASE_URL}/functions/v1/send-reminders',
+    headers := '{"Content-Type": "application/json", "Authorization": "Bearer ${SUPABASE_ANON_KEY}"}'::jsonb,
+    body := concat('{"time": "', now(), '"}')::jsonb
+  ) AS request_id;\$cron\$
+);
+SQLEOF
   ok "Cron Job configurado"
 
   # ── 6. Site URL via Management API ────────────────────────
@@ -512,8 +529,9 @@ configure_supabase_auto() {
     -H "Authorization: Bearer ${SUPABASE_ACCESS_TOKEN}" \
     -H "Content-Type: application/json" \
     -d "{\"site_url\":\"https://${APP_DOMAIN}\"}" || true
-  ok "Site URL configurado: https://$APP_DOMAIN"
+  ok "Site URL configurado: https://${APP_DOMAIN}"
 }
+
 
 # ─── PASSO 7 — Build do frontend ─────────────────────────────
 build_frontend() {
