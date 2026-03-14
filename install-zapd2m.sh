@@ -173,6 +173,30 @@ collect_credentials() {
     warn "Não foi possível validar a conexão (HTTP $HTTP_STATUS). Verifique as chaves."
   fi
 
+  # Senha do banco de dados
+  echo ""
+  echo -e "  ${YELLOW}Durante a criação do projeto no Supabase, você definiu uma senha para o banco.${NC}"
+  ask "Você definiu uma senha para o banco de dados? (S/n)"
+  read -r HAS_DB_PASSWORD
+  HAS_DB_PASSWORD=$(echo "$HAS_DB_PASSWORD" | tr '[:upper:]' '[:lower:]')
+  if [[ "$HAS_DB_PASSWORD" != "n" && "$HAS_DB_PASSWORD" != "nao" && "$HAS_DB_PASSWORD" != "não" ]]; then
+    echo -e "  ${YELLOW}Acesse: https://supabase.com/dashboard → seu projeto → Settings → Database${NC}"
+    ask "Senha do banco de dados (Database Password)"
+    read -rs SUPABASE_DB_PASSWORD
+    echo ""
+    while [ -z "$SUPABASE_DB_PASSWORD" ]; do
+      warn "Senha não pode ser vazia. Se não lembrar, redefina no painel do Supabase."
+      ask "Senha do banco de dados"
+      read -rs SUPABASE_DB_PASSWORD
+      echo ""
+    done
+    ok "Senha do banco configurada"
+  else
+    SUPABASE_DB_PASSWORD=""
+    warn "Sem senha definida — o link com o banco pode falhar."
+    info "Se houver erros nas migrations, defina uma senha no Supabase e reinstale."
+  fi
+
   # Access Token (para secrets e deploy de funções)
   separator
   echo -e "  ${YELLOW}Acesse: https://supabase.com/dashboard → Account → Access Tokens${NC}"
@@ -338,20 +362,19 @@ deploy_supabase() {
   export SUPABASE_ACCESS_TOKEN="$SUPABASE_ACCESS_TOKEN"
   supabase login --no-browser 2>/dev/null || true
 
-  # Link ao projeto
+  # Link ao projeto (com timeout para não travar)
   info "Vinculando ao projeto..."
-  supabase link --project-ref "$SUPABASE_PROJECT_REF" \
-    --password "" 2>/dev/null || true
+  timeout 30 supabase link     --project-ref "$SUPABASE_PROJECT_REF"     --password "$SUPABASE_DB_PASSWORD" 2>/dev/null || true
   ok "Projeto vinculado"
 
-  # Migrations
+  # Migrations (com timeout)
   echo ""
   info "Aplicando migrations no banco..."
-  (supabase db push --include-all 2>&1 | tail -5) &
+  (timeout 120 supabase db push --include-all 2>&1 | tail -5) &
   spinner $! "Executando migrations..."
   ok "Migrations aplicadas!"
 
-  # Edge Functions
+  # Edge Functions (deploy direto sem link, usando project-ref)
   local FUNCTIONS=(
     "send-reminders" "whatsapp-instances" "whatsapp-webhook"
     "chat-ai" "process-document" "manage-scheduling"
@@ -364,9 +387,7 @@ deploy_supabase() {
   for fn in "${FUNCTIONS[@]}"; do
     current=$((current + 1))
     echo -en "  ${CYAN}[$current/$total]${NC} Deployando ${WHITE}$fn${NC}..."
-    if supabase functions deploy "$fn" \
-      --no-verify-jwt \
-      --project-ref "$SUPABASE_PROJECT_REF" &>/dev/null; then
+    if timeout 60 supabase functions deploy "$fn"       --no-verify-jwt       --project-ref "$SUPABASE_PROJECT_REF" &>/dev/null; then
       echo -e " ${GREEN}✔${NC}"
     else
       echo -e " ${RED}✘${NC}"
